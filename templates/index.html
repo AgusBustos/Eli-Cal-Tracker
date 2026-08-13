@@ -2074,7 +2074,7 @@
                     body: JSON.stringify({ materia_id: materiaId, veces_cursada: parseInt(veces) })
                 });
                 if (res.ok) {
-                    window.location.reload();
+                    showToast('Autoguardado: Veces cursada');
                 } else {
                     alert('Error al actualizar veces cursada');
                 }
@@ -2102,11 +2102,7 @@
                 
                 if (result.success) {
                     showToast(`¡Nota actualizada correctamente!`);
-                    
-                    // Esperamos un instante y refrescamos la página para recalcular promedios
-                    setTimeout(() => {
-                        location.reload();
-                    }, 800);
+
                 } else {
                     showToast("Error: " + result.message, true);
                 }
@@ -2185,11 +2181,7 @@
                 
                 if (result.success) {
                     showToast(`¡Materia actualizada a ${nuevoEstado}!`);
-                    
-                    // Esperamos una pequeña fracción de segundo para que el usuario aprecie el cambio en el botón y refrescamos los cálculos en el backend
-                    setTimeout(() => {
-                        location.reload();
-                    }, 800);
+
                 } else {
                     showToast("Error: " + result.message, true);
                 }
@@ -2860,11 +2852,29 @@
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.classList.remove('active');
         });
-        document.getElementById('tab-' + tabId).classList.add('active');
-        if (event) {
+        
+        const tabPane = document.getElementById('tab-' + tabId);
+        if (tabPane) tabPane.classList.add('active');
+        
+        if (event && event.currentTarget) {
             event.currentTarget.classList.add('active');
+        } else {
+            // Restore active state to the correct nav button if event is missing (e.g. on load)
+            const btn = document.querySelector(`.nav-btn[onclick*="switchTab('${tabId}'"]`);
+            if (btn) btn.classList.add('active');
         }
+        
+        // AUTOGUARDADO DE PESTAÑA: Memoriza dónde está el usuario para no mandarlo al inicio si la página se recarga
+        localStorage.setItem('activeTab', tabId);
     }
+    
+    // Restaurar la pestaña guardada al cargar la página
+    document.addEventListener('DOMContentLoaded', () => {
+        const savedTab = localStorage.getItem('activeTab');
+        if (savedTab) {
+            switchTab(savedTab, null);
+        }
+    });
 </script>
 
 <script>
