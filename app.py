@@ -560,7 +560,7 @@ def add_horario():
     try:
         with conn.cursor() as cur:
             cur.execute("INSERT INTO horarios_cursada (usuario_id, materia_id, dia_semana, hora_inicio, hora_fin, aula_comision) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;", 
-                        (user_id, data['materia_id'], data['dia_semana'], data['hora_inicio'], data['hora_fin'], data.get('aula_comision', '')))
+                        (user_id, data['materia_id'], str(data['dia_semana']), data['hora_inicio'], data['hora_fin'], data.get('aula_comision', '')))
             h_id = cur.fetchone()[0]
             conn.commit()
         return jsonify({"success": True, "horario_id": h_id})
@@ -577,7 +577,7 @@ def edit_horario():
     try:
         with conn.cursor() as cur:
             cur.execute("UPDATE horarios_cursada SET materia_id = %s, dia_semana = %s, hora_inicio = %s, hora_fin = %s, aula_comision = %s WHERE id = %s AND usuario_id = %s;", 
-                        (data['materia_id'], data['dia_semana'], data['hora_inicio'], data['hora_fin'], data.get('aula_comision', ''), data['horario_id'], user_id))
+                        (data['materia_id'], str(data['dia_semana']), data['hora_inicio'], data['hora_fin'], data.get('aula_comision', ''), data['horario_id'], user_id))
             conn.commit()
         return jsonify({"success": True})
     finally:
