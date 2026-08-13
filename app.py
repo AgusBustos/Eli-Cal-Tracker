@@ -254,13 +254,14 @@ def index():
             # 1. Progreso
             cur.execute("""
                 SELECT 
-                    COUNT(*) as total,
-                    COUNT(CASE WHEN estado = 'Aprobada' THEN 1 END) as aprobadas,
-                    COUNT(CASE WHEN estado = 'Regular' THEN 1 END) as regulares,
-                    COUNT(CASE WHEN estado = 'Pendiente' THEN 1 END) as pendientes
-                FROM usuario_materias
-                WHERE usuario_id = %s;
-            """, (user_id,))
+                    COUNT(m.id) as total,
+                    COUNT(CASE WHEN um.estado = 'Aprobada' THEN 1 END) as aprobadas,
+                    COUNT(CASE WHEN um.estado = 'Regular' THEN 1 END) as regulares,
+                    COUNT(CASE WHEN um.estado = 'Pendiente' THEN 1 END) as pendientes
+                FROM materias m
+                JOIN usuario_materias um ON m.id = um.materia_id
+                WHERE um.usuario_id = %s AND m.carrera_id = %s;
+            """, (user_id, user['carrera_id']))
             stats = cur.fetchone()
             
             total = stats['total'] or 0
@@ -441,6 +442,7 @@ def index():
                 tiempo_total_cursada_str = "0h"
             
             # 8. Obtener Ranking Global (Top 5)
+            # Solo consideramos las materias correspondientes a la carrera elegida por cada usuario
             cur.execute("""
                 SELECT 
                     u.username, 
@@ -450,7 +452,8 @@ def index():
                     ROUND((COUNT(um.materia_id) FILTER (WHERE um.estado = 'Aprobada') * 100.0) / NULLIF(COUNT(um.materia_id), 0), 1) as avance_porcentaje
                 FROM usuarios u
                 JOIN carreras c ON u.carrera_id = c.id
-                JOIN usuario_materias um ON u.id = um.usuario_id
+                JOIN materias m ON c.id = m.carrera_id
+                JOIN usuario_materias um ON u.id = um.usuario_id AND m.id = um.materia_id
                 GROUP BY u.id, u.username, c.nombre
                 ORDER BY materias_aprobadas DESC, promedio DESC
                 LIMIT 5;
