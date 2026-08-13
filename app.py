@@ -73,7 +73,8 @@ def get_db_connection():
 
 @app.route('/login/google')
 def login_google():
-    redirect_uri = url_for('auth_google', _external=True)
+    # Force HTTPS explicitly for cloud environments behind load balancers
+    redirect_uri = url_for('auth_google', _external=True, _scheme='https')
     return google.authorize_redirect(redirect_uri)
 
 @app.route('/login/google/callback')
