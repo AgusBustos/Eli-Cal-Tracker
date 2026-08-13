@@ -79,49 +79,51 @@ def login_google():
 
 @app.route('/login/google/callback')
 def auth_google():
-    token = google.authorize_access_token()
-    user_info = token.get('userinfo')
-    if not user_info:
-        # Some providers return it inside token, else fetch it
-        user_info = google.userinfo()
-    
-    email = user_info.get('email')
-    name = user_info.get('name')
-    google_id = user_info.get('sub')
-    
-    conn = get_db_connection()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT id, is_admin FROM usuarios WHERE email = %s OR google_id = %s", (email, google_id))
-            user = cur.fetchone()
-            
-            if user:
-                session['user_id'] = user['id']
-                session['username'] = name
-                session['is_admin'] = user.get('is_admin', False)
+        token = google.authorize_access_token()
+        user_info = token.get('userinfo')
+        if not user_info:
+            user_info = google.userinfo()
+        
+        email = user_info.get('email')
+        name = user_info.get('name')
+        google_id = user_info.get('sub')
+        
+        conn = get_db_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT id, is_admin FROM usuarios WHERE email = %s OR google_id = %s", (email, google_id))
+                user = cur.fetchone()
                 
-                # Update google_id if null
-                cur.execute("UPDATE usuarios SET google_id = %s, email = %s WHERE id = %s", (google_id, email, user['id']))
-            else:
-                cur.execute("INSERT INTO usuarios (username, email, google_id) VALUES (%s, %s, %s) RETURNING id", 
-                            (name, email, google_id))
-                new_id = cur.fetchone()['id']
-                session['user_id'] = new_id
-                session['username'] = name
-                session['is_admin'] = False
-                
-                # Assign default materias
-                cur.execute("SELECT id FROM materias")
-                materias = cur.fetchall()
-                for m in materias:
-                    cur.execute("INSERT INTO usuario_materias (usuario_id, materia_id, estado) VALUES (%s, %s, 'Pendiente')", (new_id, m['id']))
-            conn.commit()
-            return redirect(url_for('index'))
+                if user:
+                    session['user_id'] = user['id']
+                    session['username'] = name
+                    session['is_admin'] = user.get('is_admin', False)
+                    
+                    # Update google_id if null
+                    cur.execute("UPDATE usuarios SET google_id = %s, email = %s WHERE id = %s", (google_id, email, user['id']))
+                else:
+                    cur.execute("INSERT INTO usuarios (username, email, google_id) VALUES (%s, %s, %s) RETURNING id", 
+                                (name, email, google_id))
+                    new_id = cur.fetchone()['id']
+                    session['user_id'] = new_id
+                    session['username'] = name
+                    session['is_admin'] = False
+                    
+                    # Assign default materias
+                    cur.execute("SELECT id FROM materias")
+                    materias = cur.fetchall()
+                    for m in materias:
+                        cur.execute("INSERT INTO usuario_materias (usuario_id, materia_id, estado) VALUES (%s, %s, 'Pendiente')", (new_id, m['id']))
+                conn.commit()
+                return redirect(url_for('index'))
+        finally:
+            conn.close()
     except Exception as e:
-        print(f"Error login google: {e}")
-        return redirect(url_for('login'))
-    finally:
-        conn.close()
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error login google: {error_details}")
+        return f"<h1>Error Interno de Google Auth</h1><pre>{error_details}</pre>", 500
 
 
 @app.route("/login", methods=["GET", "POST"])
