@@ -188,9 +188,10 @@ def elegir_carrera():
                 if not carrera_id:
                     return redirect(url_for("elegir_carrera"))
                 
-                # Check if it's currently allowed (only Sistemas = 1 is allowed as per the plan)
-                if int(carrera_id) != 1:
-                    return "Carrera no disponible por ahora", 400
+                # Verify career exists
+                cur.execute("SELECT id FROM carreras WHERE id = %s", (carrera_id,))
+                if not cur.fetchone():
+                    return "Carrera no válida", 400
                     
                 user_id = session['user_id']
                 

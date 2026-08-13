@@ -118,15 +118,9 @@
         
         <div class="career-grid">
             {% for c in carreras %}
-                {% if c.id == 1 %}
                 <div class="career-card" onclick="selectCareer({{ c.id }}, this)">
-                    <i class="fa-solid fa-laptop-code"></i>
-                    <h3 style="margin: 0; font-size: 1.1rem;">{{ c.nombre }}</h3>
-                </div>
-                {% else %}
-                <div class="career-card disabled" onclick="showToast('¡Pronto! Estamos cargando el plan de estudios para {{ c.nombre }}.')">
-                    <div class="badge-soon">PRONTO</div>
-                    {% if c.id == 2 %} <i class="fa-solid fa-industry"></i>
+                    {% if c.id == 1 %} <i class="fa-solid fa-laptop-code"></i>
+                    {% elif c.id == 2 %} <i class="fa-solid fa-industry"></i>
                     {% elif c.id == 3 %} <i class="fa-solid fa-building"></i>
                     {% elif c.id == 4 %} <i class="fa-solid fa-cogs"></i>
                     {% elif c.id == 5 %} <i class="fa-solid fa-microchip"></i>
@@ -134,7 +128,6 @@
                     {% endif %}
                     <h3 style="margin: 0; font-size: 1.1rem;">{{ c.nombre }}</h3>
                 </div>
-                {% endif %}
             {% endfor %}
         </div>
 
