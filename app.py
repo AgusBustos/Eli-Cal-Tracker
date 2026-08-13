@@ -106,11 +106,7 @@ def auth_google():
                     session['username'] = name
                     session['is_admin'] = False
                     
-                    # Assign default materias
-                    cur.execute("SELECT id FROM materias")
-                    materias = cur.fetchall()
-                    for m in materias:
-                        cur.execute("INSERT INTO usuario_materias (usuario_id, materia_id, estado) VALUES (%s, %s, 'Pendiente')", (new_id, m['id']))
+
                 conn.commit()
                 return redirect(url_for('index'))
         finally:
