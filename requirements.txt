@@ -1,3 +1,8 @@
 Flask==3.0.3
 psycopg2-binary>=2.9.10
-python-dotenv==1.0.1
+python-dotenv
+authlib
+requests
+Flask-APScheduler
+Flask-Mail==1.0.1
+gunicorn==22.0.0

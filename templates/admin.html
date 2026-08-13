@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Eli-Cal Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --success: #22c55e;
+            --warning: #eab308;
+            --danger: #ef4444;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        h1 {
+            margin: 0;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2rem;
+        }
+        .btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--glass-border);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            color: white;
+            text-decoration: none;
+            transition: 0.3s;
+        }
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        th {
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+        tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .badge-success { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+        .badge-warning { background: rgba(234, 179, 8, 0.2); color: var(--warning); }
+        .badge-neutral { background: rgba(148, 163, 184, 0.2); color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1><i class="fa-solid fa-crown"></i> Panel de Administración</h1>
+                <p style="color: var(--text-secondary); margin: 0.5rem 0 0 0;">Hola, {{ username }}. Aquí puedes ver el progreso de todos los estudiantes.</p>
+            </div>
+            <a href="/" class="btn"><i class="fa-solid fa-arrow-left"></i> Volver a mi tracker</a>
+        </header>
+
+        <div class="card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Progreso General</th>
+                        <th>Aprobadas</th>
+                        <th>Regulares</th>
+                        <th>Pendientes</th>
+                        <th>Promedio Gral.</th>
+                        <th>Horas Semanales</th>
+                        <th>Registrado el</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in estudiantes %}
+                    <tr>
+                        <td style="color: var(--text-secondary);">#{{ e.id }}</td>
+                        <td style="font-weight: 600;"><i class="fa-solid fa-user" style="color: var(--text-secondary); margin-right: 0.5rem;"></i> {{ e.username }}</td>
+                        <td>
+                            {% set total = e.total_materias %}
+                            {% set progreso = (e.aprobadas * 100.0 / total) if total > 0 else 0 %}
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; width: 100px;">
+                                    <div style="height: 100%; width: {{ progreso }}%; background: var(--success);"></div>
+                                </div>
+                                <span style="font-size: 0.85rem; color: var(--text-secondary);">{{ "%.1f"|format(progreso) }}%</span>
+                            </div>
+                        </td>
+                        <td><span class="badge badge-success">{{ e.aprobadas }}</span></td>
+                        <td><span class="badge badge-warning">{{ e.regulares }}</span></td>
+                        <td><span class="badge badge-neutral">{{ e.pendientes }}</span></td>
+                        <td>
+                            {% if e.promedio_general %}
+                                <strong>{{ e.promedio_general }}</strong>
+                            {% else %}
+                                <span style="color: var(--text-secondary);">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong style="color: #fbbf24;">{{ "%.1f"|format(e.horas_semanales) }}h</strong>
+                        </td>
+                        <td style="color: var(--text-secondary); font-size: 0.9rem;">{{ e.created_at.strftime('%d/%m/%Y') }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: var(--text-secondary); padding: 3rem;">
+                            <i class="fa-solid fa-ghost" style="font-size: 2rem; margin-bottom: 1rem; display: block;"></i>
+                            Aún no hay otros estudiantes registrados.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

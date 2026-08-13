@@ -1,0 +1,183 @@
+{
+  "materias": [
+    {
+      "id": 12,
+      "estado": "Aprobada",
+      "nota_final": 10,
+      "veces_cursada": 0
+    },
+    {
+      "id": 2,
+      "estado": "Regular",
+      "nota_final": null,
+      "veces_cursada": 1
+    },
+    {
+      "id": 6,
+      "estado": "Aprobada",
+      "nota_final": 8,
+      "veces_cursada": 1
+    },
+    {
+      "id": 11,
+      "estado": "Aprobada",
+      "nota_final": 9,
+      "veces_cursada": 1
+    },
+    {
+      "id": 4,
+      "estado": "Aprobada",
+      "nota_final": 8,
+      "veces_cursada": 1
+    },
+    {
+      "id": 8,
+      "estado": "Aprobada",
+      "nota_final": 7,
+      "veces_cursada": 1
+    },
+    {
+      "id": 16,
+      "estado": "Pendiente",
+      "nota_final": null,
+      "veces_cursada": 1
+    },
+    {
+      "id": 7,
+      "estado": "Pendiente",
+      "nota_final": null,
+      "veces_cursada": 1
+    },
+    {
+      "id": 5,
+      "estado": "Aprobada",
+      "nota_final": 7,
+      "veces_cursada": 3
+    },
+    {
+      "id": 3,
+      "estado": "Pendiente",
+      "nota_final": null,
+      "veces_cursada": 1
+    },
+    {
+      "id": 1,
+      "estado": "Pendiente",
+      "nota_final": null,
+      "veces_cursada": 1
+    }
+  ],
+  "parciales": [
+    {
+      "materia_id": 8,
+      "nombre": "2do Parcial Teorico",
+      "fecha": "2026-11-11T09:40:00",
+      "descripcion": ""
+    },
+    {
+      "materia_id": 1,
+      "nombre": "RECU Practico ",
+      "fecha": "2026-11-13T11:10:00",
+      "descripcion": ""
+    },
+    {
+      "materia_id": 1,
+      "nombre": "RECU Teorico",
+      "fecha": "2026-11-18T09:40:00",
+      "descripcion": ""
+    }
+  ],
+  "horarios": [
+    {
+      "materia_id": 7,
+      "dia_semana": 2,
+      "hora_inicio": "08:00:00",
+      "hora_fin": "11:10:00",
+      "aula_comision": "Aula 520, 1K2"
+    },
+    {
+      "materia_id": 14,
+      "dia_semana": 2,
+      "hora_inicio": "12:05:00",
+      "hora_fin": "15:40:00",
+      "aula_comision": "Aula 400, 2K6"
+    },
+    {
+      "materia_id": 16,
+      "dia_semana": 2,
+      "hora_inicio": "15:40:00",
+      "hora_fin": "18:05:00",
+      "aula_comision": "Aula 500, 2K6"
+    },
+    {
+      "materia_id": 24,
+      "dia_semana": 2,
+      "hora_inicio": "18:15:00",
+      "hora_fin": "19:45:00",
+      "aula_comision": "Aula 230, 3R2"
+    },
+    {
+      "materia_id": 13,
+      "dia_semana": 2,
+      "hora_inicio": "19:55:00",
+      "hora_fin": "23:05:00",
+      "aula_comision": "Aula 500, 2K10"
+    },
+    {
+      "materia_id": 13,
+      "dia_semana": 3,
+      "hora_inicio": "19:55:00",
+      "hora_fin": "23:05:00",
+      "aula_comision": "Aula 520, 2K10"
+    },
+    {
+      "materia_id": 1,
+      "dia_semana": 3,
+      "hora_inicio": "09:40:00",
+      "hora_fin": "11:10:00",
+      "aula_comision": "Aula 411, 1K2"
+    },
+    {
+      "materia_id": 3,
+      "dia_semana": 3,
+      "hora_inicio": "11:20:00",
+      "hora_fin": "14:00:00",
+      "aula_comision": "Aula 500, 1K2"
+    },
+    {
+      "materia_id": 14,
+      "dia_semana": 3,
+      "hora_inicio": "14:55:00",
+      "hora_fin": "18:05:00",
+      "aula_comision": "LabSiS, 2K6"
+    },
+    {
+      "materia_id": 7,
+      "dia_semana": 4,
+      "hora_inicio": "08:00:00",
+      "hora_fin": "11:10:00",
+      "aula_comision": "Aula 702, 1K2"
+    },
+    {
+      "materia_id": 16,
+      "dia_semana": 4,
+      "hora_inicio": "13:15:00",
+      "hora_fin": "15:40:00",
+      "aula_comision": "Aula 206, 2K6"
+    },
+    {
+      "materia_id": 3,
+      "dia_semana": 5,
+      "hora_inicio": "09:40:00",
+      "hora_fin": "11:10:00",
+      "aula_comision": "Aula 702, 1K2"
+    },
+    {
+      "materia_id": 1,
+      "dia_semana": 5,
+      "hora_inicio": "11:20:00",
+      "hora_fin": "14:00:00",
+      "aula_comision": "Aula 702, 1K2"
+    }
+  ]
+}

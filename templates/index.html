@@ -8,32 +8,43 @@
 <!-- Google Fonts: Outfit -->
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- FontAwesome para iconos premium -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
 <style>
-        /* CSS Integrado - Estilo Premium Dark Glassmorphism */
+/* CSS Integrado - Estilo Premium Dark Glassmorphism */
         :root {
             --bg-gradient: radial-gradient(circle at top, #1e1b4b 0%, #0f172a 100%);
             --glass-bg: rgba(17, 24, 39, 0.7);
             --glass-border: rgba(255, 255, 255, 0.08);
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
-            
-            /* Paleta de colores de estados */
-            --color-aprobada: #10b981; /* Verde esmeralda */
+            --color-aprobada: #10b981;
             --color-aprobada-glow: rgba(16, 185, 129, 0.15);
-            --color-regular: #06b6d4; /* Azul cian */
+            --color-regular: #06b6d4;
             --color-regular-glow: rgba(6, 182, 212, 0.15);
-            --color-pendiente: #64748b; /* Slate grey */
+            --color-pendiente: #64748b;
             --color-pendiente-glow: rgba(100, 116, 139, 0.1);
-            
-            /* Acentos */
             --accent-purple: #8b5cf6;
             --accent-purple-glow: rgba(139, 92, 246, 0.4);
             --accent-pink: #ec4899;
-            
             --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        :root.light-mode {
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(0, 0, 0, 0.05);
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --color-aprobada: #059669;
+            --color-aprobada-glow: rgba(5, 150, 105, 0.2);
+            --color-regular: #0284c7;
+            --color-regular-glow: rgba(2, 132, 199, 0.2);
+            --color-pendiente: #94a3b8;
+            --color-pendiente-glow: rgba(148, 163, 184, 0.2);
         }
 
         * {
@@ -50,8 +61,9 @@
             line-height: 1.5;
             padding: 2rem 1rem;
             display: flex;
-            justify-content: center;
-            align-items: flex-start;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
         }
 
         .container {
@@ -828,6 +840,8 @@
 
 <style>
         .main-nav {
+            position: relative;
+            z-index: 9999;
             display: flex;
             gap: 0.5rem;
             margin-bottom: 2rem;
@@ -882,20 +896,35 @@
 <body>
 <div class="container">
 <!-- Header -->
-<header>
+<header style="position: relative; z-index: 9999;">
 <div class="logo-area">
 <i class="fa-solid fa-graduation-cap"></i>
 <span>Eli-Cal</span>
 </div>
 <h1>Mi Tracker Universitario</h1>
 <p>Control de materias, estados académicos y correlatividades</p>
-</header><nav class="main-nav">
-<button class="nav-btn active" onclick="switchTab('inicio', event)"><i class="fa-solid fa-house"></i> Inicio</button>
-<button class="nav-btn" onclick="switchTab('evaluaciones', event)"><i class="fa-solid fa-calendar-check"></i> Evaluaciones</button>
-<button class="nav-btn" onclick="switchTab('horario', event)"><i class="fa-solid fa-clock"></i> Horario Semanal</button>
-<button class="nav-btn" onclick="switchTab('plan', event)"><i class="fa-solid fa-book"></i> Plan de Estudios</button>
-<button class="nav-btn" onclick="switchTab('mapa', event)"><i class="fa-solid fa-diagram-project"></i> Correlativas</button>
-</nav><div class="tab-pane active" id="tab-inicio"><section class="dashboard-hero">
+</header>
+<nav class="main-nav" style="display: flex; justify-content: space-between; align-items: center;">
+    <div style="display: flex; gap: 0.5rem; overflow-x: auto; flex: 1;">
+        <button class="nav-btn active" onclick="switchTab('inicio', event)"><i class="fa-solid fa-house"></i> Inicio</button>
+        <button class="nav-btn" onclick="switchTab('evaluaciones', event)"><i class="fa-solid fa-calendar-check"></i> Evaluaciones</button>
+        <button class="nav-btn" onclick="switchTab('horario', event)"><i class="fa-solid fa-clock"></i> Horario Semanal</button>
+        <button class="nav-btn" onclick="switchTab('plan', event)"><i class="fa-solid fa-book"></i> Plan de Estudios</button>
+        <button class="nav-btn" onclick="switchTab('mapa', event)"><i class="fa-solid fa-diagram-project"></i> Correlativas</button>
+        <!-- <button class="nav-btn" onclick="switchTab('diagrama', event)"><i class="fa-solid fa-network-wired"></i> Diagrama</button> -->
+    </div>
+    <div style="display: flex; align-items: center; gap: 1rem; padding-left: 1rem; border-left: 1px solid rgba(255,255,255,0.1); margin-left: 0.5rem;">
+        {% if is_admin %}
+        <a href="/admin" style="color: #fbbf24; text-decoration: none; font-size: 0.9rem; padding: 0.5rem 1rem; background: rgba(251, 191, 36, 0.1); border-radius: 8px; transition: 0.3s; font-weight: 600;"><i class="fa-solid fa-crown"></i> Admin</a>
+        {% endif %}
+        <button id="theme-toggle" class="nav-btn" style="padding: 0.5rem; border-radius: 50%;" title="Cambiar Tema">
+            <i class="fa-solid fa-moon"></i>
+        </button>
+        <span style="color: var(--text-secondary); font-size: 0.9rem;"><i class="fa-solid fa-user"></i> {{ username }}</span>
+        <a href="/logout" style="color: #f87171; text-decoration: none; font-size: 0.9rem; padding: 0.5rem 1rem; background: rgba(239, 68, 68, 0.1); border-radius: 8px; transition: 0.3s;"><i class="fa-solid fa-right-from-bracket"></i> Salir</a>
+    </div>
+</nav>
+<div class="tab-pane active" id="tab-inicio"><section class="dashboard-hero">
 <!-- Barra de Progreso -->
 <div class="progress-section">
 <div class="progress-label">
@@ -1029,7 +1058,12 @@
 </div>
                         {% endif %}
                     </div>
-</section></div></div><div class="tab-pane" id="tab-evaluaciones"><div class="main-grid"><div style="display: flex; flex-direction: column; gap: 2.5rem;"><section class="glass-panel agenda-parciales-panel" style="border: 1px solid rgba(139, 92, 246, 0.2); box-shadow: 0 10px 30px rgba(139, 92, 246, 0.05); position: relative; margin-top: 2.5rem;">
+</section></div></div>
+
+<div class="tab-pane" id="tab-evaluaciones">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 2rem;">
+        <!-- Columna Izquierda: Calendario -->
+        <div><section class="glass-panel agenda-parciales-panel" style="border: 1px solid rgba(139, 92, 246, 0.2); box-shadow: 0 10px 30px rgba(139, 92, 246, 0.05); position: relative; margin-top: 2.5rem;">
 <style>
                         .agenda-parciales-panel::before {
                             content: '';
@@ -1294,10 +1328,11 @@
                             align-items: center;
                             justify-content: center;
                             opacity: 0;
-                            pointer-events: none;
+                            display: none;
                             transition: opacity 0.3s ease;
                         }
                         .modal-overlay.show {
+                            display: flex;
                             opacity: 1;
                             pointer-events: auto;
                         }
@@ -1417,8 +1452,12 @@
 <!-- Inyectado por JS -->
 </div>
 </div>
-<!-- Agenda de Parciales -->
-<div class="parciales-list-wrapper collapsible-panel">
+</section>
+        </div>
+        <!-- Columna Derecha: Próximos Parciales -->
+        <div>
+            <!-- Agenda de Parciales -->
+            <div class="parciales-list-wrapper collapsible-panel">
 <div class="parciales-list-header" onclick="toggleLeftPanel(this)" style="cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center; width: 100%; margin: 1.5rem 0 1rem 0; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.05);">
 <div style="display: flex; align-items: center; gap: 0.5rem;">
 <i class="fa-solid fa-chevron-down toggle-icon" style="transition: var(--transition-smooth); font-size: 0.9rem; color: var(--text-secondary);"></i>
@@ -1431,7 +1470,7 @@
 <div class="parciales-cards-container panel-content" id="parcialesCardsContainer">
                             {% if parciales %}
                                 {% for parcial in parciales %}
-                                    <div class="parcial-card" data-descripcion="{{ parcial.descripcion or '' }}" data-fecha-iso="{{ parcial.fecha_iso }}" data-materia-id="{{ parcial.materia_id }}" data-nombre="{{ parcial.nombre }}" data-parcial-id="{{ parcial.id }}" title="{{ parcial.descripcion }}">
+                                    <div class="parcial-card" data-descripcion="{{ parcial.descripcion or '' }}" data-fecha-iso="{{ parcial.fecha_iso }}" data-materia-id="{{ parcial.materia_id }}" data-nombre="{{ parcial.nombre }}" data-parcial-id="{{ parcial.id }}" data-notificar="{{ 'true' if parcial.notificar else 'false' }}" data-antelacion="{{ parcial.antelacion_dias }}" title="{{ parcial.descripcion }}">
 <div class="parcial-card-header">
 <div>
 <span class="parcial-materia-title">{{ parcial.materia_nombre }} (Año {{ parcial.materia_nivel }})</span>
@@ -1471,8 +1510,62 @@
 </div>
                             {% endif %}
                         </div>
+                    </div>
+        </div>
+    </div>
 </div>
-</section></div></div></div><div class="tab-pane" id="tab-horario"></div><div class="tab-pane" id="tab-plan"></div><div class="tab-pane" id="tab-mapa">
+<div class="tab-pane" id="tab-plan">
+    <section class="glass-panel" style="margin-bottom: 2.5rem;">
+        <div class="section-header">
+            <i class="fa-solid fa-book" style="background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
+            <h2>Plan de Estudios Detallado</h2>
+        </div>
+        <div class="panel-content">
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Aquí puedes ver todas las materias separadas por año, con tu nota final y veces cursada.</p>
+            {% for nivel, materias in plan_estudios.items() %}
+            <div class="card" style="margin-bottom: 1.5rem; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.05);">
+                <h3 style="margin-top: 0; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem;">
+                    Nivel {{ nivel }} 
+                    {% if promedios_por_nivel.get(nivel) %}
+                        <span style="font-size: 0.9rem; float: right; color: var(--success);"><i class="fa-solid fa-star"></i> Promedio: {{ promedios_por_nivel[nivel] }}</span>
+                    {% endif %}
+                </h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="text-align: left; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">
+                            <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Materia</th>
+                            <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Estado</th>
+                            <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Nota Final</th>
+                            <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Veces Cursada</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in materias %}
+                        <tr>
+                            <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02); font-weight: 500;">{{ m.nombre }}</td>
+                            <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02);">
+                                <select onchange="updateMateriaEstado({{ m.id }}, this.value)" style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--glass-border); border-radius: 4px; padding: 0.3rem;">
+                                    <option value="Pendiente" style="color: black;" {% if m.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+                                    <option value="Regular" style="color: black;" {% if m.estado == 'Regular' %}selected{% endif %}>Regular</option>
+                                    <option value="Aprobada" style="color: black;" {% if m.estado == 'Aprobada' %}selected{% endif %}>Aprobada</option>
+                                </select>
+                            </td>
+                            <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02);">
+                                <input type="number" min="1" max="10" step="1" value="{{ m.nota_final if m.nota_final else '' }}" onchange="updateMateriaNota({{ m.id }}, this.value)" style="width: 70px; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--glass-border); border-radius: 4px; padding: 0.3rem;" {% if m.estado != 'Aprobada' %}disabled placeholder="-" {% endif %}>
+                            </td>
+                            <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02);">
+                                <input type="number" min="0" step="1" value="{{ m.veces_cursada if m.veces_cursada else 0 }}" onchange="updateMateriaVeces({{ m.id }}, this.value)" style="width: 70px; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--glass-border); border-radius: 4px; padding: 0.3rem;">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+<div class="tab-pane" id="tab-mapa">
 <section class="glass-panel">
 <div class="section-header">
 <i class="fa-solid fa-diagram-project" style="background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;"></i>
@@ -1513,6 +1606,7 @@
 </div>
 <!-- Dashboard Hero (Resumen y Progreso) -->
 
+<div class="tab-pane" id="tab-horario">
 <!-- Sección: Horario Semanal de Cursada (Calendario de Cursada) -->
 <section class="glass-panel horario-semanal-panel collapsible-panel" style="margin-bottom: 2.5rem; border: 1px solid rgba(6, 182, 212, 0.2); position: relative;">
 <style>
@@ -1743,9 +1837,48 @@
                 </div>
 </div>
 </section>
+</div>
 <!-- Contenedor Grid Principal -->
 
 </div>
+<!-- Tab 6: Diagrama Visual de Correlativas -->
+<div class="tab-pane" id="tab-diagrama">
+    <section class="dashboard-hero" style="margin-bottom: 2rem;">
+        <h2 style="margin: 0; font-size: 1.8rem; background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            <i class="fa-solid fa-network-wired"></i> Red de Correlativas
+        </h2>
+        <p style="color: var(--text-secondary); margin-top: 0.5rem;">Diagrama visual interactivo de todas las materias y sus dependencias.</p>
+    </section>
+    <div class="card" style="padding: 2rem; overflow-x: auto; background: var(--glass-bg);">
+        <div class="mermaid">
+        graph TD
+        {% for m in materias_all %}
+            M{{ m.id }}["{{ m.nombre|replace('\"', '')|replace('(', '')|replace(')', '')|replace('[', '')|replace(']', '')|replace('{', '')|replace('}', '') }}"]
+        {% endfor %}
+        
+        {% for m_id, requisitos in correlativas_info.items() %}
+            {% for req in requisitos['Regularizada'] %}
+                M{{ req.id }} -.-> M{{ m_id }}
+            {% endfor %}
+            {% for req in requisitos['Aprobada'] %}
+                M{{ req.id }} ==> M{{ m_id }}
+            {% endfor %}
+        {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+    mermaid.initialize({ 
+        startOnLoad: true, 
+        theme: 'dark',
+        securityLevel: 'loose',
+        flowchart: { useMaxWidth: false, htmlLabels: true, curve: 'basis' }
+    });
+</script>
+
+
+</main>
 <!-- Modal para Agregar Parcial -->
 <div class="modal-overlay" id="addParcialModal" onclick="closeAddParcialModalOnOverlay(event)">
 <div class="modal-content">
@@ -1781,6 +1914,25 @@
 <label for="parcialDescripcion">Notas / Temario (Opcional)</label>
 <textarea class="form-control" id="parcialDescripcion" placeholder="Ej: Unidades 1 a 4, Aula 302..." rows="3"></textarea>
 </div>
+<div class="form-group" style="margin-top: 1rem;">
+    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+        <input type="checkbox" id="add-parcial-notificar" style="width: 18px; height: 18px;">
+        ¿Recibir recordatorio por correo?
+    </label>
+</div>
+<div class="form-group" id="add-parcial-antelacion-group" style="display: none; margin-top: 1rem;">
+    <label for="add-parcial-antelacion">Anticipación del aviso</label>
+    <select class="form-control" id="add-parcial-antelacion">
+        <option value="1">1 día antes</option>
+        <option value="3">3 días antes</option>
+        <option value="7">1 semana antes</option>
+    </select>
+</div>
+<script>
+    document.getElementById('add-parcial-notificar').addEventListener('change', function() {
+        document.getElementById('add-parcial-antelacion-group').style.display = this.checked ? 'block' : 'none';
+    });
+</script>
 <button class="btn-form-submit" type="submit">
 <i class="fa-solid fa-circle-check"></i> Guardar Examen
                 </button>
@@ -1914,7 +2066,25 @@
             }
         }
 
-        // Función AJAX para actualizar la nota final
+        async function updateMateriaVeces(materiaId, veces) {
+            try {
+                const res = await fetch('/update-veces-cursada', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ materia_id: materiaId, veces_cursada: parseInt(veces) })
+                });
+                if (res.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Error al actualizar veces cursada');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error de conexión');
+            }
+        }
+
+        // --- Funciones para Modal Parciales ---nota final
         async function updateMateriaNota(materiaId, nota) {
             try {
                 const response = await fetch("/update-nota", {
@@ -2168,9 +2338,19 @@
         function openAddParcialModal() {
             const modal = document.getElementById('addParcialModal');
             if (modal) {
-                editingParcialId = null;
+                // Reset form and checkbox
+                const form = document.getElementById('addParcialForm');
+                if (form) form.reset();
+                
+                const checkboxNotificar = document.getElementById('add-parcial-notificar');
+                if (checkboxNotificar) checkboxNotificar.checked = false;
+                
+                const antelacionGroup = document.getElementById('add-parcial-antelacion-group');
+                if (antelacionGroup) antelacionGroup.style.display = 'none';
+
                 setModalMode(false);
                 modal.classList.add('show');
+                
                 // Poner la fecha de hoy por defecto en el selector
                 const now = new Date();
                 const offset = now.getTimezoneOffset() * 60000;
@@ -2222,6 +2402,8 @@
             const nombre = card.getAttribute('data-nombre');
             const fechaIso = card.getAttribute('data-fecha-iso');
             const descripcion = card.getAttribute('data-descripcion');
+            const notificar = card.getAttribute('data-notificar') === 'true';
+            const antelacion = card.getAttribute('data-antelacion') || '1';
 
             // Pre-cargar en inputs
             document.getElementById('parcialMateria').value = materiaId;
@@ -2233,6 +2415,12 @@
             }
             
             document.getElementById('parcialDescripcion').value = descripcion || '';
+
+            // Pre-cargar checkbox y select
+            const checkboxNotificar = document.getElementById('add-parcial-notificar');
+            checkboxNotificar.checked = notificar;
+            document.getElementById('add-parcial-antelacion').value = antelacion;
+            document.getElementById('add-parcial-antelacion-group').style.display = notificar ? 'block' : 'none';
 
             // Limpiar buscador y re-filtrar
             const searchInput = document.getElementById('parcialMateriaSearch');
@@ -2327,7 +2515,9 @@
                 materia_id: materiaId,
                 nombre: nombre,
                 fecha: fecha,
-                descripcion: descripcion
+                descripcion: descripcion,
+                notificar: document.getElementById('add-parcial-notificar').checked,
+                antelacion_dias: parseInt(document.getElementById('add-parcial-antelacion').value)
             };
             if (editingParcialId) {
                 payload.parcial_id = editingParcialId;
@@ -2675,6 +2865,106 @@
             event.currentTarget.classList.add('active');
         }
     }
-    </script>
+</script>
+
+<script>
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    const rootElement = document.documentElement;
+    const themeIcon = themeToggleBtn.querySelector('i');
+
+    function setTheme(isLight) {
+        if (isLight) {
+            rootElement.classList.add('light-mode');
+            themeIcon.classList.remove('fa-moon');
+            themeIcon.classList.add('fa-sun');
+            localStorage.setItem('theme', 'light');
+        } else {
+            rootElement.classList.remove('light-mode');
+            themeIcon.classList.remove('fa-sun');
+            themeIcon.classList.add('fa-moon');
+            localStorage.setItem('theme', 'dark');
+        }
+    }
+
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+        setTheme(true);
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+        const isLight = !rootElement.classList.contains('light-mode');
+        setTheme(isLight);
+    });
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const ctxEstado = document.getElementById('estadoChart').getContext('2d');
+        const estadosData = [
+            {{ materias_all | selectattr('estado', 'equalto', 'Aprobada') | list | length }},
+            {{ materias_all | selectattr('estado', 'equalto', 'Regular') | list | length }},
+            {{ materias_all | selectattr('estado', 'equalto', 'Pendiente') | list | length }}
+        ];
+        
+        new Chart(ctxEstado, {
+            type: 'doughnut',
+            data: {
+                labels: ['Aprobadas', 'Regulares', 'Pendientes'],
+                datasets: [{
+                    data: estadosData,
+                    backgroundColor: ['#10b981', '#06b6d4', '#64748b'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: 'var(--text-secondary)' } }
+                }
+            }
+        });
+
+        const ctxProm = document.getElementById('promedioChart').getContext('2d');
+        // Extraer notas de las aprobadas
+        {% set aprobadas = materias_all | selectattr('estado', 'equalto', 'Aprobada') | list %}
+        const notas = [
+            {% for a in aprobadas %}
+                {% if a.nota %} {{ a.nota }}, {% endif %}
+            {% endfor %}
+        ];
+        
+        const counts = {6:0, 7:0, 8:0, 9:0, 10:0};
+        notas.forEach(n => { if(counts[n] !== undefined) counts[n]++; });
+        
+        new Chart(ctxProm, {
+            type: 'bar',
+            data: {
+                labels: ['6', '7', '8', '9', '10'],
+                datasets: [{
+                    label: 'Cantidad de Materias',
+                    data: [counts[6], counts[7], counts[8], counts[9], counts[10]],
+                    backgroundColor: '#8b5cf6',
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1, color: 'var(--text-secondary)' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+                    x: { ticks: { color: 'var(--text-secondary)' }, grid: { display: false } }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    });
+</script>
+
+<footer style="text-align: center; padding: 2rem 1rem; color: var(--text-secondary); font-size: 0.9rem; margin-top: 2rem; border-top: 1px solid var(--glass-border);">
+    ¿Encontraste algún bug o tienes una sugerencia? Contáctanos a: <a href="mailto:elicaltracker@gmail.com" style="color: var(--accent-purple); text-decoration: none; font-weight: 500;">elicaltracker@gmail.com</a>
+</footer>
 </body>
+
 </html>

@@ -1,15 +1,51 @@
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
+from authlib.integrations.flask_client import OAuth
+from flask_apscheduler import APScheduler
+from flask_mail import Mail, Message
+import datetime
 
-# Cargar variables de entorno desde el archivo .env si existe
 load_dotenv()
 
-app = Flask(__name__)
 
-# Configuración de base de datos PostgreSQL desde variables de entorno con fallbacks
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "super_secret_key_for_eli_cal")
+
+# Email Config
+app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 465))
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', '')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
+app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', 'False').lower() in ['true', '1', 't']
+app.config['MAIL_USE_SSL'] = os.getenv('MAIL_USE_SSL', 'True').lower() in ['true', '1', 't']
+mail = Mail(app)
+
+# Scheduler
+scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
+
+# OAuth
+oauth = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id=os.getenv('GOOGLE_CLIENT_ID'),
+    client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),
+    access_token_url='https://accounts.google.com/o/oauth2/token',
+    access_token_params=None,
+    authorize_url='https://accounts.google.com/o/oauth2/auth',
+    authorize_params=None,
+    api_base_url='https://www.googleapis.com/oauth2/v1/',
+    userinfo_endpoint='https://openidconnect.googleapis.com/v1/userinfo',
+    client_kwargs={'scope': 'openid email profile'},
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration'
+)
+
+
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "tracker_universitario")
 DB_USER = os.getenv("DB_USER", "postgres")
@@ -17,7 +53,6 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
 DB_PORT = os.getenv("DB_PORT", "5432")
 
 def get_db_connection():
-    """Establece y devuelve una conexión a la base de datos PostgreSQL."""
     return psycopg2.connect(
         host=DB_HOST,
         database=DB_NAME,
@@ -26,40 +61,156 @@ def get_db_connection():
         port=DB_PORT
     )
 
+
+@app.route('/login/google')
+def login_google():
+    redirect_uri = url_for('auth_google', _external=True)
+    return google.authorize_redirect(redirect_uri)
+
+@app.route('/login/google/callback')
+def auth_google():
+    token = google.authorize_access_token()
+    user_info = token.get('userinfo')
+    if not user_info:
+        # Some providers return it inside token, else fetch it
+        user_info = google.userinfo()
+    
+    email = user_info.get('email')
+    name = user_info.get('name')
+    google_id = user_info.get('sub')
+    
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id, is_admin FROM usuarios WHERE email = %s OR google_id = %s", (email, google_id))
+            user = cur.fetchone()
+            
+            if user:
+                session['user_id'] = user['id']
+                session['username'] = name
+                session['is_admin'] = user.get('is_admin', False)
+                
+                # Update google_id if null
+                cur.execute("UPDATE usuarios SET google_id = %s, email = %s WHERE id = %s", (google_id, email, user['id']))
+            else:
+                cur.execute("INSERT INTO usuarios (username, email, google_id) VALUES (%s, %s, %s) RETURNING id", 
+                            (name, email, google_id))
+                new_id = cur.fetchone()['id']
+                session['user_id'] = new_id
+                session['username'] = name
+                session['is_admin'] = False
+                
+                # Assign default materias
+                cur.execute("SELECT id FROM materias")
+                materias = cur.fetchall()
+                for m in materias:
+                    cur.execute("INSERT INTO usuario_materias (usuario_id, materia_id, estado) VALUES (%s, %s, 'Pendiente')", (new_id, m['id']))
+            conn.commit()
+            return redirect(url_for('index'))
+    except Exception as e:
+        print(f"Error login google: {e}")
+        return redirect(url_for('login'))
+    finally:
+        conn.close()
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        
+        conn = get_db_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT id, password_hash, is_admin FROM usuarios WHERE username = %s", (username,))
+                user = cur.fetchone()
+                
+                if user and check_password_hash(user['password_hash'], password):
+                    session['user_id'] = user['id']
+                    session['username'] = username
+                    session['is_admin'] = user['is_admin']
+                    return redirect(url_for("index"))
+                else:
+                    return render_template("login.html", error="Usuario o contraseña incorrectos")
+        finally:
+            conn.close()
+            
+    return render_template("login.html")
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        
+        if not username or not password:
+            return render_template("register.html", error="Completa todos los campos")
+            
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM usuarios WHERE username = %s", (username,))
+                if cur.fetchone():
+                    return render_template("register.html", error="El usuario ya existe")
+                
+                pw_hash = generate_password_hash(password)
+                cur.execute("INSERT INTO usuarios (username, password_hash) VALUES (%s, %s) RETURNING id", (username, pw_hash))
+                user_id = cur.fetchone()[0]
+                conn.commit()
+                
+                session['user_id'] = user_id
+                session['username'] = username
+                return redirect(url_for("index"))
+        finally:
+            conn.close()
+            
+    return render_template("register.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
 @app.route("/")
 def index():
+    if 'user_id' not in session:
+        return redirect(url_for("login"))
+        
+    user_id = session['user_id']
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             
-            # 1. Progreso: Calcular estadísticas de la carrera
+            # 1. Progreso
             cur.execute("""
                 SELECT 
                     COUNT(*) as total,
                     COUNT(CASE WHEN estado = 'Aprobada' THEN 1 END) as aprobadas,
                     COUNT(CASE WHEN estado = 'Regular' THEN 1 END) as regulares,
                     COUNT(CASE WHEN estado = 'Pendiente' THEN 1 END) as pendientes
-                FROM materias;
-            """)
+                FROM usuario_materias
+                WHERE usuario_id = %s;
+            """, (user_id,))
             stats = cur.fetchone()
             
             total = stats['total'] or 0
             aprobadas = stats['aprobadas'] or 0
             regulares = stats['regulares'] or 0
             pendientes = stats['pendientes'] or 0
-            
             progreso = round((aprobadas * 100.0) / total, 1) if total > 0 else 0.0
 
-            # 2. Plan de Estudios: Obtener todas las materias ordenadas por nivel y nombre (incluyendo nota_final y veces_cursada)
+            # 2. Plan de Estudios
             cur.execute("""
-                SELECT id, nombre, nivel, estado, nota_final, veces_cursada
-                FROM materias 
-                ORDER BY nivel, nombre;
-            """)
+                SELECT m.id, m.nombre, m.nivel, um.estado, um.nota_final, um.veces_cursada
+                FROM materias m
+                JOIN usuario_materias um ON m.id = um.materia_id
+                WHERE um.usuario_id = %s
+                ORDER BY m.nivel, m.nombre;
+            """, (user_id,))
             materias_all = cur.fetchall()
 
-            # Agrupar materias por nivel (año de la carrera)
             plan_estudios = {}
             for m in materias_all:
                 nivel = m['nivel']
@@ -67,55 +218,53 @@ def index():
                     plan_estudios[nivel] = []
                 plan_estudios[nivel].append(m)
 
-            # Calcular promedios por nivel y general
             promedios_por_nivel = {}
             for nivel, materias in plan_estudios.items():
                 aprobadas_con_nota = [m for m in materias if m['estado'] == 'Aprobada' and m['nota_final'] is not None]
-                if aprobadas_con_nota:
-                    promedios_por_nivel[nivel] = round(sum(m['nota_final'] for m in aprobadas_con_nota) / len(aprobadas_con_nota), 2)
-                else:
-                    promedios_por_nivel[nivel] = None
+                promedios_por_nivel[nivel] = round(sum(m['nota_final'] for m in aprobadas_con_nota) / len(aprobadas_con_nota), 2) if aprobadas_con_nota else None
 
             todas_aprobadas_con_nota = [m for m in materias_all if m['estado'] == 'Aprobada' and m['nota_final'] is not None]
             promedio_general = round(sum(m['nota_final'] for m in todas_aprobadas_con_nota) / len(todas_aprobadas_con_nota), 2) if todas_aprobadas_con_nota else 0.0
 
-            # 3. Materias Habilitadas para Cursar:
-            # Estado 'Pendiente' y que no tengan correlativas de tipo 'Regularizada' sin cumplir (que no estén regularizadas o aprobadas)
+            # 3. Materias Habilitadas para Cursar
             cur.execute("""
                 SELECT m.id, m.nombre, m.nivel
                 FROM materias m
-                WHERE m.estado = 'Pendiente'
+                JOIN usuario_materias um ON m.id = um.materia_id
+                WHERE um.usuario_id = %s AND um.estado = 'Pendiente'
                   AND NOT EXISTS (
                       SELECT 1 
                       FROM correlativas c
-                      JOIN materias corr ON c.correlativa_id = corr.id
+                      JOIN usuario_materias corr_um ON c.correlativa_id = corr_um.materia_id
                       WHERE c.materia_id = m.id
+                        AND corr_um.usuario_id = %s
                         AND c.tipo_requisito = 'Regularizada'
-                        AND corr.estado NOT IN ('Regular', 'Aprobada')
+                        AND corr_um.estado NOT IN ('Regular', 'Aprobada')
                   )
                 ORDER BY m.nivel, m.nombre;
-            """)
+            """, (user_id, user_id))
             materias_habilitadas_cursar = cur.fetchall()
 
-            # 4. Materias Habilitadas para Rendir Examen Final:
-            # Estado 'Regular' y que no tengan correlativas de tipo 'Aprobada' sin cumplir (que no estén aprobadas)
+            # 4. Materias Habilitadas para Rendir
             cur.execute("""
                 SELECT m.id, m.nombre, m.nivel
                 FROM materias m
-                WHERE m.estado = 'Regular'
+                JOIN usuario_materias um ON m.id = um.materia_id
+                WHERE um.usuario_id = %s AND um.estado = 'Regular'
                   AND NOT EXISTS (
                       SELECT 1 
                       FROM correlativas c
-                      JOIN materias corr ON c.correlativa_id = corr.id
+                      JOIN usuario_materias corr_um ON c.correlativa_id = corr_um.materia_id
                       WHERE c.materia_id = m.id
+                        AND corr_um.usuario_id = %s
                         AND c.tipo_requisito = 'Aprobada'
-                        AND corr.estado <> 'Aprobada'
+                        AND corr_um.estado <> 'Aprobada'
                   )
                 ORDER BY m.nivel, m.nombre;
-            """)
+            """, (user_id, user_id))
             materias_habilitadas_rendir = cur.fetchall()
 
-            # 4. Obtener listado de correlativas para cada materia para poder mostrarlas en la UI
+            # Correlativas
             cur.execute("""
                 SELECT 
                     c.materia_id, 
@@ -123,14 +272,15 @@ def index():
                     c.tipo_requisito, 
                     corr.nombre as correlativa_nombre,
                     corr.nivel as correlativa_nivel,
-                    corr.estado as correlativa_estado
+                    corr_um.estado as correlativa_estado
                 FROM correlativas c
                 JOIN materias corr ON c.correlativa_id = corr.id
+                JOIN usuario_materias corr_um ON corr.id = corr_um.materia_id
+                WHERE corr_um.usuario_id = %s
                 ORDER BY c.materia_id, c.tipo_requisito, corr.nivel, corr.nombre;
-            """)
+            """, (user_id,))
             correlativas_rows = cur.fetchall()
 
-            # Estructurar la información de las correlativas
             correlativas_info = {}
             for r in correlativas_rows:
                 m_id = r['materia_id']
@@ -144,39 +294,43 @@ def index():
                     'estado': r['correlativa_estado']
                 })
 
-            # 5. Obtener parciales programados con fecha formateada en ISO para JS
+            # 5. Parciales
             cur.execute("""
-                SELECT p.id, p.materia_id, p.nombre, to_char(p.fecha, 'YYYY-MM-DD"T"HH24:MI:SS') as fecha_iso, p.descripcion, m.nombre as materia_nombre, m.nivel as materia_nivel
+                SELECT p.id, p.materia_id, p.nombre, to_char(p.fecha, 'YYYY-MM-DD"T"HH24:MI:SS') as fecha_iso, p.descripcion, m.nombre as materia_nombre, m.nivel as materia_nivel, p.notificar, p.antelacion_dias
                 FROM parciales p
                 JOIN materias m ON p.materia_id = m.id
+                WHERE p.usuario_id = %s
                 ORDER BY p.fecha ASC;
-            """)
+            """, (user_id,))
             parciales = cur.fetchall()
 
-            # 6. Obtener las materias disponibles para rendir/cursar parciales (excluyendo aprobadas y no habilitadas)
+            # 6. Materias disponibles agenda
             cur.execute("""
-                SELECT m.id, m.nombre, m.nivel, m.estado
+                SELECT m.id, m.nombre, m.nivel, um.estado
                 FROM materias m
-                WHERE m.estado <> 'Aprobada'
+                JOIN usuario_materias um ON m.id = um.materia_id
+                WHERE um.usuario_id = %s AND um.estado <> 'Aprobada'
                   AND NOT EXISTS (
                       SELECT 1 
                       FROM correlativas c
-                      JOIN materias corr ON c.correlativa_id = corr.id
+                      JOIN usuario_materias corr_um ON c.correlativa_id = corr_um.materia_id
                       WHERE c.materia_id = m.id
+                        AND corr_um.usuario_id = %s
                         AND c.tipo_requisito = 'Regularizada'
-                        AND corr.estado NOT IN ('Regular', 'Aprobada')
+                        AND corr_um.estado NOT IN ('Regular', 'Aprobada')
                   )
                 ORDER BY m.nivel, m.nombre;
-            """)
+            """, (user_id, user_id))
             materias_disponibles_agenda = cur.fetchall()
 
-            # 7. Obtener los horarios de cursada registrados
+            # 7. Horarios cursada
             cur.execute("""
                 SELECT h.id, h.materia_id, h.dia_semana, to_char(h.hora_inicio, 'HH24:MI') as hora_inicio, to_char(h.hora_fin, 'HH24:MI') as hora_fin, h.aula_comision, m.nombre as materia_nombre, m.nivel as materia_nivel
                 FROM horarios_cursada h
                 JOIN materias m ON h.materia_id = m.id
+                WHERE h.usuario_id = %s
                 ORDER BY h.dia_semana, h.hora_inicio;
-            """)
+            """, (user_id,))
             horarios_cursada_raw = cur.fetchall()
 
             horarios_cursada = []
@@ -203,8 +357,6 @@ def index():
                             else:
                                 current['tiempo_muerto'] = f"{dm}m"
 
-
-            # Calcular total de horas de cursada
             total_minutos_cursada = 0
             for h in horarios_cursada:
                 h_i = h['hora_inicio']
@@ -223,6 +375,8 @@ def index():
 
         return render_template(
             "index.html",
+            username=session.get('username'),
+            is_admin=session.get('is_admin'),
             progreso=progreso,
             total_materias=total,
             aprobadas=aprobadas,
@@ -242,332 +396,240 @@ def index():
         )
         
     except psycopg2.OperationalError as e:
-        # En caso de error de conexión a la BD, mostramos una UI de error descriptiva
         return render_template("error.html", error_message=str(e), config={
-            "host": DB_HOST,
-            "database": DB_NAME,
-            "user": DB_USER,
-            "port": DB_PORT
+            "host": DB_HOST, "database": DB_NAME, "user": DB_USER, "port": DB_PORT
         })
+    finally:
+        if conn:
+            conn.close()
+
+@app.route("/admin")
+def admin_panel():
+    if not session.get('is_admin'):
+        return redirect(url_for("index"))
+        
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT 
+                    u.id, 
+                    u.username,
+                    u.created_at,
+                    COUNT(um.materia_id) as total_materias,
+                    SUM(CASE WHEN um.estado = 'Aprobada' THEN 1 ELSE 0 END) as aprobadas,
+                    SUM(CASE WHEN um.estado = 'Regular' THEN 1 ELSE 0 END) as regulares,
+                    SUM(CASE WHEN um.estado = 'Pendiente' THEN 1 ELSE 0 END) as pendientes,
+                    ROUND(AVG(CASE WHEN um.estado = 'Aprobada' AND um.nota_final IS NOT NULL THEN um.nota_final ELSE NULL END), 2) as promedio_general,
+                    COALESCE((SELECT SUM(EXTRACT(EPOCH FROM (h.hora_fin - h.hora_inicio))/3600) FROM horarios_cursada h WHERE h.usuario_id = u.id), 0) as horas_semanales
+                FROM usuarios u
+                LEFT JOIN usuario_materias um ON u.id = um.usuario_id
+                WHERE u.is_admin = FALSE
+                GROUP BY u.id
+                ORDER BY u.created_at DESC;
+            """)
+            estudiantes = cur.fetchall()
+            
+        return render_template("admin.html", estudiantes=estudiantes, username=session.get('username'))
+    except psycopg2.OperationalError as e:
+        return render_template("error.html", error_message=str(e), config={"host": DB_HOST})
     finally:
         if conn:
             conn.close()
 
 @app.route("/update-estado", methods=["POST"])
 def update_estado():
-    """Ruta API para actualizar dinámicamente el estado de una materia y devolver el resultado."""
+    if 'user_id' not in session: return jsonify({"success": False, "message": "No autenticado"}), 401
+    user_id = session['user_id']
     data = request.get_json()
-    if not data or 'materia_id' not in data or 'nuevo_estado' not in data:
-        return jsonify({"success": False, "message": "Datos de petición incompletos o inválidos."}), 400
-    
     materia_id = data['materia_id']
     nuevo_estado = data['nuevo_estado']
     
-    if nuevo_estado not in ['Pendiente', 'Regular', 'Aprobada']:
-        return jsonify({"success": False, "message": f"Estado '{nuevo_estado}' no es válido."}), 400
-
-    conn = None
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
         with conn.cursor() as cur:
-            # Actualizar el estado de la materia y reiniciar nota si no está aprobada
             if nuevo_estado != 'Aprobada':
-                cur.execute("""
-                    UPDATE materias 
-                    SET estado = %s, nota_final = NULL 
-                    WHERE id = %s;
-                """, (nuevo_estado, materia_id))
+                cur.execute("UPDATE usuario_materias SET estado = %s, nota_final = NULL WHERE usuario_id = %s AND materia_id = %s;", (nuevo_estado, user_id, materia_id))
             else:
-                cur.execute("""
-                    UPDATE materias 
-                    SET estado = %s 
-                    WHERE id = %s;
-                """, (nuevo_estado, materia_id))
+                cur.execute("UPDATE usuario_materias SET estado = %s WHERE usuario_id = %s AND materia_id = %s;", (nuevo_estado, user_id, materia_id))
             conn.commit()
-            
-        return jsonify({"success": True, "message": f"Estado de la materia {materia_id} actualizado a '{nuevo_estado}'."})
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error al actualizar base de datos: {str(e)}"}), 500
+        return jsonify({"success": True})
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 @app.route("/update-nota", methods=["POST"])
 def update_nota():
-    """Ruta API para actualizar dinámicamente la nota de una materia aprobada."""
+    if 'user_id' not in session: return jsonify({"success": False, "message": "No autenticado"}), 401
+    user_id = session['user_id']
     data = request.get_json()
-    if not data or 'materia_id' not in data or 'nota' not in data:
-        return jsonify({"success": False, "message": "Datos de petición incompletos."}), 400
-    
     materia_id = data['materia_id']
-    nota = data['nota']
+    nota = int(data['nota']) if data['nota'] else None
     
-    if nota is not None and nota != "":
-        try:
-            nota = int(nota)
-            if nota < 1 or nota > 10:
-                return jsonify({"success": False, "message": "La nota debe estar entre 1 y 10."}), 400
-        except ValueError:
-            return jsonify({"success": False, "message": "La nota debe ser un número entero válido."}), 400
-    else:
-        nota = None
-        
-    conn = None
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
         with conn.cursor() as cur:
-            # Solo permitir actualizar nota si el estado es 'Aprobada'
-            cur.execute("""
-                UPDATE materias 
-                SET nota_final = %s 
-                WHERE id = %s AND estado = 'Aprobada';
-            """, (nota, materia_id))
+            cur.execute("UPDATE usuario_materias SET nota_final = %s WHERE usuario_id = %s AND materia_id = %s AND estado = 'Aprobada';", (nota, user_id, materia_id))
             conn.commit()
-            
-        return jsonify({"success": True, "message": f"Nota de la materia {materia_id} actualizada a {nota if nota else 'NULL'}."})
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error al actualizar nota: {str(e)}"}), 500
+        return jsonify({"success": True})
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 @app.route("/update-veces-cursada", methods=["POST"])
 def update_veces_cursada():
-    """Ruta API para actualizar dinámicamente el contador de veces cursada de una materia."""
+    if 'user_id' not in session: return jsonify({"success": False, "message": "No autenticado"}), 401
+    user_id = session['user_id']
     data = request.get_json()
-    if not data or 'materia_id' not in data or 'veces_cursada' not in data:
-        return jsonify({"success": False, "message": "Datos de petición incompletos."}), 400
-    
     materia_id = data['materia_id']
+    veces = int(data['veces_cursada'])
+    
+    conn = get_db_connection()
     try:
-        veces_cursada = int(data['veces_cursada'])
-        if veces_cursada < 0:
-            return jsonify({"success": False, "message": "El contador no puede ser menor a 0."}), 400
-    except ValueError:
-        return jsonify({"success": False, "message": "El contador debe ser un número entero válido."}), 400
-        
-    conn = None
-    try:
-        conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE materias 
-                SET veces_cursada = %s 
-                WHERE id = %s;
-            """, (veces_cursada, materia_id))
+            cur.execute("UPDATE usuario_materias SET veces_cursada = %s WHERE usuario_id = %s AND materia_id = %s;", (veces, user_id, materia_id))
             conn.commit()
-            
-        return jsonify({"success": True, "message": f"Contador de veces cursada actualizado a {veces_cursada}."})
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error al actualizar el contador: {str(e)}"}), 500
+        return jsonify({"success": True})
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 @app.route("/add-parcial", methods=["POST"])
 def add_parcial():
-    """Ruta API para agregar un nuevo parcial a la agenda."""
+    if 'user_id' not in session: return jsonify({"success": False, "message": "No autenticado"}), 401
+    user_id = session['user_id']
     data = request.get_json()
-    if not data or 'materia_id' not in data or 'nombre' not in data or 'fecha' not in data:
-        return jsonify({"success": False, "message": "Datos de petición incompletos."}), 400
     
-    materia_id = data['materia_id']
-    nombre = data['nombre']
-    fecha_str = data['fecha']  # Formato 'YYYY-MM-DDTHH:MM' desde input datetime-local
-    descripcion = data.get('descripcion', '')
+    notificar = bool(data.get('notificar', False))
+    antelacion = int(data.get('antelacion_dias', 1))
     
-    if not nombre.strip():
-        return jsonify({"success": False, "message": "El nombre del parcial no puede estar vacío."}), 400
-        
-    conn = None
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO parciales (materia_id, nombre, fecha, descripcion)
-                VALUES (%s, %s, %s, %s)
-                RETURNING id;
-            """, (materia_id, nombre, fecha_str, descripcion))
+            cur.execute("INSERT INTO parciales (usuario_id, materia_id, nombre, fecha, descripcion, notificar, antelacion_dias) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id;", 
+                        (user_id, data['materia_id'], data['nombre'], data['fecha'], data.get('descripcion', ''), notificar, antelacion))
             parcial_id = cur.fetchone()[0]
             conn.commit()
-            
-        return jsonify({
-            "success": True, 
-            "message": "Parcial agregado correctamente.",
-            "parcial_id": parcial_id
-        })
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error al guardar el parcial: {str(e)}"}), 500
+        return jsonify({"success": True, "parcial_id": parcial_id})
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 @app.route("/delete-parcial", methods=["POST"])
 def delete_parcial():
-    """Ruta API para eliminar un parcial de la agenda."""
+    if 'user_id' not in session: return jsonify({"success": False, "message": "No autenticado"}), 401
+    user_id = session['user_id']
     data = request.get_json()
-    if not data or 'parcial_id' not in data:
-        return jsonify({"success": False, "message": "Datos de petición incompletos."}), 400
     
-    parcial_id = data['parcial_id']
-    
-    conn = None
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM parciales WHERE id = %s;", (parcial_id,))
+            cur.execute("DELETE FROM parciales WHERE id = %s AND usuario_id = %s;", (data['parcial_id'], user_id))
             conn.commit()
-            
-        return jsonify({"success": True, "message": "Parcial eliminado correctamente."})
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error al eliminar el parcial: {str(e)}"}), 500
+        return jsonify({"success": True})
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 @app.route("/edit-parcial", methods=["POST"])
 def edit_parcial():
-    """Ruta API para editar un parcial existente en la agenda."""
+    if 'user_id' not in session: return jsonify({"success": False, "message": "No autenticado"}), 401
+    user_id = session['user_id']
     data = request.get_json()
-    if not data or 'parcial_id' not in data or 'materia_id' not in data or 'nombre' not in data or 'fecha' not in data:
-        return jsonify({"success": False, "message": "Datos de petición incompletos."}), 400
     
-    parcial_id = data['parcial_id']
-    materia_id = data['materia_id']
-    nombre = data['nombre']
-    fecha_str = data['fecha']  # Formato 'YYYY-MM-DDTHH:MM' desde input datetime-local
-    descripcion = data.get('descripcion', '')
+    notificar = bool(data.get('notificar', False))
+    antelacion = int(data.get('antelacion_dias', 1))
     
-    if not nombre.strip():
-        return jsonify({"success": False, "message": "El nombre del parcial no puede estar vacío."}), 400
-        
-    conn = None
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE parciales 
-                SET materia_id = %s, nombre = %s, fecha = %s, descripcion = %s 
-                WHERE id = %s;
-            """, (materia_id, nombre, fecha_str, descripcion, parcial_id))
+            cur.execute("UPDATE parciales SET materia_id = %s, nombre = %s, fecha = %s, descripcion = %s, notificar = %s, antelacion_dias = %s WHERE id = %s AND usuario_id = %s;", 
+                        (data['materia_id'], data['nombre'], data['fecha'], data.get('descripcion', ''), notificar, antelacion, data['parcial_id'], user_id))
             conn.commit()
-            
-        return jsonify({"success": True, "message": "Parcial actualizado correctamente."})
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error al actualizar el parcial: {str(e)}"}), 500
+        return jsonify({"success": True})
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 @app.route("/add-horario", methods=["POST"])
 def add_horario():
-    """Ruta API para agregar un nuevo horario de cursada."""
+    if 'user_id' not in session: return jsonify({"success": False, "message": "No autenticado"}), 401
+    user_id = session['user_id']
     data = request.get_json()
-    if not data or 'materia_id' not in data or 'dia_semana' not in data or 'hora_inicio' not in data or 'hora_fin' not in data:
-        return jsonify({"success": False, "message": "Datos de petición incompletos."}), 400
     
-    materia_id = data['materia_id']
+    conn = get_db_connection()
     try:
-        dia_semana = int(data['dia_semana'])
-        if dia_semana < 1 or dia_semana > 6:
-            return jsonify({"success": False, "message": "Día de la semana no válido (debe ser entre Lunes=1 y Sábado=6)."}), 400
-    except ValueError:
-        return jsonify({"success": False, "message": "El día de la semana debe ser un número entero."}), 400
-
-    hora_inicio = data['hora_inicio']
-    hora_fin = data['hora_fin']
-    aula_comision = data.get('aula_comision', '')
-    
-    if hora_fin <= hora_inicio:
-        return jsonify({"success": False, "message": "La hora de fin debe ser posterior a la hora de inicio."}), 400
-        
-    conn = None
-    try:
-        conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO horarios_cursada (materia_id, dia_semana, hora_inicio, hora_fin, aula_comision)
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING id;
-            """, (materia_id, dia_semana, hora_inicio, hora_fin, aula_comision))
-            horario_id = cur.fetchone()[0]
+            cur.execute("INSERT INTO horarios_cursada (usuario_id, materia_id, dia_semana, hora_inicio, hora_fin, aula_comision) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;", 
+                        (user_id, data['materia_id'], data['dia_semana'], data['hora_inicio'], data['hora_fin'], data.get('aula_comision', '')))
+            h_id = cur.fetchone()[0]
             conn.commit()
-            
-        return jsonify({
-            "success": True, 
-            "message": "Horario de cursada agregado correctamente.",
-            "horario_id": horario_id
-        })
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error al guardar el horario: {str(e)}"}), 500
+        return jsonify({"success": True, "horario_id": h_id})
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 @app.route("/edit-horario", methods=["POST"])
 def edit_horario():
-    """Ruta API para editar un horario de cursada existente."""
+    if 'user_id' not in session: return jsonify({"success": False, "message": "No autenticado"}), 401
+    user_id = session['user_id']
     data = request.get_json()
-    if not data or 'horario_id' not in data or 'materia_id' not in data or 'dia_semana' not in data or 'hora_inicio' not in data or 'hora_fin' not in data:
-        return jsonify({"success": False, "message": "Datos de petición incompletos."}), 400
     
-    horario_id = data['horario_id']
-    materia_id = data['materia_id']
+    conn = get_db_connection()
     try:
-        dia_semana = int(data['dia_semana'])
-        if dia_semana < 1 or dia_semana > 6:
-            return jsonify({"success": False, "message": "Día de la semana no válido."}), 400
-    except ValueError:
-        return jsonify({"success": False, "message": "El día de la semana debe ser un número entero."}), 400
-
-    hora_inicio = data['hora_inicio']
-    hora_fin = data['hora_fin']
-    aula_comision = data.get('aula_comision', '')
-    
-    if hora_fin <= hora_inicio:
-        return jsonify({"success": False, "message": "La hora de fin debe ser posterior a la hora de inicio."}), 400
-        
-    conn = None
-    try:
-        conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE horarios_cursada 
-                SET materia_id = %s, dia_semana = %s, hora_inicio = %s, hora_fin = %s, aula_comision = %s 
-                WHERE id = %s;
-            """, (materia_id, dia_semana, hora_inicio, hora_fin, aula_comision, horario_id))
+            cur.execute("UPDATE horarios_cursada SET materia_id = %s, dia_semana = %s, hora_inicio = %s, hora_fin = %s, aula_comision = %s WHERE id = %s AND usuario_id = %s;", 
+                        (data['materia_id'], data['dia_semana'], data['hora_inicio'], data['hora_fin'], data.get('aula_comision', ''), data['horario_id'], user_id))
             conn.commit()
-            
-        return jsonify({"success": True, "message": "Horario actualizado correctamente."})
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error al actualizar el horario: {str(e)}"}), 500
+        return jsonify({"success": True})
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 @app.route("/delete-horario", methods=["POST"])
 def delete_horario():
-    """Ruta API para eliminar un horario de cursada."""
+    if 'user_id' not in session: return jsonify({"success": False, "message": "No autenticado"}), 401
+    user_id = session['user_id']
     data = request.get_json()
-    if not data or 'horario_id' not in data:
-        return jsonify({"success": False, "message": "Datos de petición incompletos."}), 400
     
-    horario_id = data['horario_id']
-    
-    conn = None
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM horarios_cursada WHERE id = %s;", (horario_id,))
+            cur.execute("DELETE FROM horarios_cursada WHERE id = %s AND usuario_id = %s;", (data['horario_id'], user_id))
             conn.commit()
-            
-        return jsonify({"success": True, "message": "Horario eliminado correctamente."})
-    except Exception as e:
-        return jsonify({"success": False, "message": f"Error al eliminar el horario: {str(e)}"}), 500
+        return jsonify({"success": True})
     finally:
-        if conn:
-            conn.close()
+        conn.close()
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
 
+
+@scheduler.task('cron', id='send_reminders', hour=9, minute=0)
+def send_reminders():
+    with app.app_context():
+        conn = get_db_connection()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                today = datetime.datetime.now().date()
+                
+                cur.execute('''
+                    SELECT p.id, p.fecha, p.nombre as p_nombre, m.nombre as materia_nombre, u.email, u.username, p.antelacion_dias
+                    FROM parciales p
+                    JOIN materias m ON p.materia_id = m.id
+                    JOIN usuarios u ON p.usuario_id = u.id
+                    WHERE p.notificar = TRUE 
+                      AND DATE(p.fecha) - p.antelacion_dias = %s
+                      AND u.email IS NOT NULL
+                ''', (today,))
+                
+                exams = cur.fetchall()
+                for exam in exams:
+                    if not exam['email']: continue
+                    msg = Message(f"Recordatorio de Examen: {exam['materia_nombre']}",
+                                  sender=app.config['MAIL_USERNAME'],
+                                  recipients=[exam['email']])
+                    dias_texto = f"{exam['antelacion_dias']} día{'s' if exam['antelacion_dias'] > 1 else ''}"
+                    msg.body = f"Hola {exam['username']},\n\nTienes un examen ('{exam['p_nombre']}') de {exam['materia_nombre']} programado para el {exam['fecha']} (en {dias_texto}).\n\n¡Mucho éxito preparándote!\nEli-Cal Tracker"
+                    try:
+                        mail.send(msg)
+                        print(f"Sent reminder to {exam['email']}")
+                    except Exception as e:
+                        print(f"Error sending email to {exam['email']}: {e}")
+        except Exception as e:
+            print(f"Error checking reminders: {e}")
+        finally:
+            conn.close()
