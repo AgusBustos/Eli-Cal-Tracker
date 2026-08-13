@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elige tu Carrera - Eli-Cal</title>
+    <!-- CSS Dependencies -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: radial-gradient(circle at top left, #1e1b4b, #0f172a);
+        }
+        .career-container {
+            max-width: 900px;
+            width: 90%;
+            margin: 2rem auto;
+            text-align: center;
+        }
+        .career-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        .career-card {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 2rem 1.5rem;
+            cursor: pointer;
+            transition: 0.3s;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+        .career-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .career-card i {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #a78bfa 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .career-card.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            filter: grayscale(0.8);
+        }
+        .career-card.disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+        .badge-soon {
+            position: absolute;
+            top: 1rem;
+            right: -2rem;
+            background: #ef4444;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.25rem 2.5rem;
+            transform: rotate(45deg);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .selected-career {
+            border-color: var(--accent-purple) !important;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.4) !important;
+        }
+        .btn-confirm {
+            margin-top: 3rem;
+            padding: 1rem 3rem;
+            font-size: 1.1rem;
+            border-radius: 30px;
+            background: linear-gradient(135deg, #a78bfa 0%, #3b82f6 100%);
+            color: white;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .btn-confirm.active {
+            opacity: 1;
+            pointer-events: auto;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+        }
+        .btn-confirm.active:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+
+<div class="career-container">
+    <div style="margin-bottom: 2rem;">
+        <i class="fa-solid fa-graduation-cap" style="font-size: 3rem; margin-bottom: 1rem; color: #a78bfa;"></i>
+        <h1 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem;">Elige tu Ingeniería</h1>
+        <p style="color: var(--text-secondary); font-size: 1.1rem;">Selecciona tu especialidad para cargar el plan de estudio oficial de la UTN FRC.</p>
+    </div>
+
+    <form method="POST" action="/elegir-carrera" id="careerForm">
+        <input type="hidden" name="carrera_id" id="carrera_id_input" value="">
+        
+        <div class="career-grid">
+            {% for c in carreras %}
+                {% if c.id == 1 %}
+                <div class="career-card" onclick="selectCareer({{ c.id }}, this)">
+                    <i class="fa-solid fa-laptop-code"></i>
+                    <h3 style="margin: 0; font-size: 1.1rem;">{{ c.nombre }}</h3>
+                </div>
+                {% else %}
+                <div class="career-card disabled" onclick="showToast('¡Pronto! Estamos cargando el plan de estudios para {{ c.nombre }}.')">
+                    <div class="badge-soon">PRONTO</div>
+                    {% if c.id == 2 %} <i class="fa-solid fa-industry"></i>
+                    {% elif c.id == 3 %} <i class="fa-solid fa-building"></i>
+                    {% elif c.id == 4 %} <i class="fa-solid fa-cogs"></i>
+                    {% elif c.id == 5 %} <i class="fa-solid fa-microchip"></i>
+                    {% else %} <i class="fa-solid fa-book"></i>
+                    {% endif %}
+                    <h3 style="margin: 0; font-size: 1.1rem;">{{ c.nombre }}</h3>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <button type="submit" class="btn-confirm" id="btnConfirm">Comenzar Aventura <i class="fa-solid fa-arrow-right"></i></button>
+    </form>
+</div>
+
+<!-- Toast Container (from index) -->
+<div id="toast" style="position: fixed; bottom: 20px; right: 20px; background: #22c55e; color: white; padding: 1rem 2rem; border-radius: 8px; transform: translateX(150%); transition: transform 0.3s; z-index: 10000; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 0.5rem;">
+    <i class="fa-solid fa-circle-check"></i>
+    <span id="toast-message">Guardado con éxito</span>
+</div>
+
+<script>
+    function selectCareer(id, element) {
+        document.querySelectorAll('.career-card').forEach(el => el.classList.remove('selected-career'));
+        element.classList.add('selected-career');
+        document.getElementById('carrera_id_input').value = id;
+        document.getElementById('btnConfirm').classList.add('active');
+    }
+
+    function showToast(message, isError = false) {
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        const icon = toast.querySelector('i');
+        
+        toast.style.background = isError ? '#ef4444' : '#f59e0b';
+        icon.className = isError ? 'fa-solid fa-circle-xmark' : 'fa-solid fa-clock';
+        
+        toastMessage.textContent = message;
+        toast.style.transform = 'translateX(0)';
+        
+        setTimeout(() => {
+            toast.style.transform = 'translateX(150%)';
+        }, 3000);
+    }
+</script>
+
+</body>
+</html>

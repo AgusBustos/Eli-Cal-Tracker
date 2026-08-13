@@ -176,6 +176,43 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
+@app.route("/elegir-carrera", methods=["GET", "POST"])
+def elegir_carrera():
+    if 'user_id' not in session: return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if request.method == "POST":
+                carrera_id = request.form.get("carrera_id")
+                if not carrera_id:
+                    return redirect(url_for("elegir_carrera"))
+                
+                # Check if it's currently allowed (only Sistemas = 1 is allowed as per the plan)
+                if int(carrera_id) != 1:
+                    return "Carrera no disponible por ahora", 400
+                    
+                user_id = session['user_id']
+                
+                # Update user with carrera_id
+                cur.execute("UPDATE usuarios SET carrera_id = %s WHERE id = %s", (carrera_id, user_id))
+                
+                # Populate usuario_materias with subjects from this career
+                cur.execute("""
+                    INSERT INTO usuario_materias (usuario_id, materia_id, estado, nota_final, veces_cursada)
+                    SELECT %s, id, 'Pendiente', NULL, 0 FROM materias WHERE carrera_id = %s
+                    ON CONFLICT (usuario_id, materia_id) DO NOTHING;
+                """, (user_id, carrera_id))
+                
+                conn.commit()
+                return redirect(url_for("index"))
+                
+            cur.execute("SELECT id, nombre FROM carreras ORDER BY id;")
+            carreras = cur.fetchall()
+            return render_template("elegir_carrera.html", carreras=carreras)
+    finally:
+        conn.close()
+
 @app.route("/")
 def index():
     if 'user_id' not in session:
@@ -186,6 +223,15 @@ def index():
     try:
         conn = get_db_connection()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            
+            # Check if user has a career chosen
+            cur.execute("SELECT carrera_id, username, is_admin FROM usuarios WHERE id = %s", (user_id,))
+            user = cur.fetchone()
+            if not user or not user['carrera_id']:
+                return redirect(url_for('elegir_carrera'))
+                
+            session['is_admin'] = user['is_admin']
+            session['username'] = user['username']
             
             # 1. Progreso
             cur.execute("""
@@ -376,6 +422,22 @@ def index():
                 tiempo_total_cursada_str = f"{total_horas_cursada}h {total_minutos_restantes}m" if total_minutos_restantes else f"{total_horas_cursada}h"
             else:
                 tiempo_total_cursada_str = "0h"
+            
+            # 8. Obtener Ranking Global
+            cur.execute("""
+                SELECT 
+                    u.username, 
+                    c.nombre as carrera,
+                    COUNT(um.materia_id) FILTER (WHERE um.estado = 'Aprobada') as materias_aprobadas,
+                    ROUND(AVG(um.nota_final) FILTER (WHERE um.estado = 'Aprobada' AND um.nota_final IS NOT NULL), 2) as promedio,
+                    ROUND((COUNT(um.materia_id) FILTER (WHERE um.estado = 'Aprobada') * 100.0) / NULLIF(COUNT(um.materia_id), 0), 1) as avance_porcentaje
+                FROM usuarios u
+                JOIN carreras c ON u.carrera_id = c.id
+                JOIN usuario_materias um ON u.id = um.usuario_id
+                GROUP BY u.id, u.username, c.nombre
+                ORDER BY materias_aprobadas DESC, promedio DESC;
+            """)
+            ranking = cur.fetchall()
 
         return render_template(
             "index.html",
@@ -396,7 +458,8 @@ def index():
             materias_all=materias_all,
             materias_disponibles_agenda=materias_disponibles_agenda,
             horarios_cursada=horarios_cursada,
-            tiempo_total_cursada_str=tiempo_total_cursada_str
+            tiempo_total_cursada_str=tiempo_total_cursada_str,
+            ranking=ranking
         )
         
     except psycopg2.OperationalError as e:
@@ -564,6 +627,9 @@ def add_horario():
             h_id = cur.fetchone()[0]
             conn.commit()
         return jsonify({"success": True, "horario_id": h_id})
+    except Exception as e:
+        import traceback
+        return jsonify({"success": False, "message": f"Server Error: {str(e)}", "trace": traceback.format_exc()}), 500
     finally:
         conn.close()
 
@@ -580,6 +646,9 @@ def edit_horario():
                         (data['materia_id'], str(data['dia_semana']), data['hora_inicio'], data['hora_fin'], data.get('aula_comision', ''), data['horario_id'], user_id))
             conn.commit()
         return jsonify({"success": True})
+    except Exception as e:
+        import traceback
+        return jsonify({"success": False, "message": f"Server Error: {str(e)}", "trace": traceback.format_exc()}), 500
     finally:
         conn.close()
 

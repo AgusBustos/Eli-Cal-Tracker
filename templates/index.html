@@ -928,6 +928,7 @@
         <button class="nav-btn" onclick="switchTab('horario', event)"><i class="fa-solid fa-clock"></i> Horario Semanal</button>
         <button class="nav-btn" onclick="switchTab('plan', event)"><i class="fa-solid fa-book"></i> Plan de Estudios</button>
         <button class="nav-btn" onclick="switchTab('mapa', event)"><i class="fa-solid fa-diagram-project"></i> Correlativas</button>
+        <button class="nav-btn" onclick="switchTab('ranking', event)"><i class="fa-solid fa-trophy" style="color: #fbbf24;"></i> Ranking Global</button>
     </div>
 </nav>
 
@@ -1635,6 +1636,90 @@
 </div>
 <!-- Dashboard Hero (Resumen y Progreso) -->
 
+<div class="tab-pane" id="tab-ranking">
+    <section class="glass-panel" style="margin-bottom: 2.5rem; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: radial-gradient(circle, rgba(251,191,36,0.2) 0%, transparent 70%); border-radius: 50%;"></div>
+        
+        <div class="section-header">
+            <i class="fa-solid fa-trophy" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 1.5rem;"></i>
+            <h2>Ranking Global Estudiantil</h2>
+        </div>
+        
+        <div class="panel-content">
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">Descubre quiénes lideran la UTN en las diferentes ingenierías. Los mejores promedios y mayor avance de carrera.</p>
+            
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: separate; border-spacing: 0 0.5rem; min-width: 700px;">
+                    <thead>
+                        <tr style="text-align: left; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">
+                            <th style="padding: 0.5rem 1rem;">Posición</th>
+                            <th style="padding: 0.5rem 1rem;">Estudiante</th>
+                            <th style="padding: 0.5rem 1rem;">Carrera</th>
+                            <th style="padding: 0.5rem 1rem; text-align: center;">Materias Aprobadas</th>
+                            <th style="padding: 0.5rem 1rem; text-align: center;">Avance</th>
+                            <th style="padding: 0.5rem 1rem; text-align: right;">Promedio General</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for idx in range(ranking|length) %}
+                        {% set r = ranking[idx] %}
+                        {% set is_top_3 = idx < 3 %}
+                        <tr style="background: rgba(30, 41, 59, {% if is_top_3 %}0.7{% else %}0.3{% endif %}); box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: 0.3s; {% if username == r.username %}border: 1px solid var(--accent-purple);{% endif %}" onmouseover="this.style.transform='scale(1.01)'" onmouseout="this.style.transform='scale(1)'">
+                            
+                            <td style="padding: 1rem; border-radius: 8px 0 0 8px; font-weight: 800; font-size: 1.2rem; text-align: center; width: 80px;">
+                                {% if idx == 0 %}
+                                    <i class="fa-solid fa-medal" style="color: #fbbf24; font-size: 1.8rem; filter: drop-shadow(0 0 10px rgba(251,191,36,0.5));"></i>
+                                {% elif idx == 1 %}
+                                    <i class="fa-solid fa-medal" style="color: #94a3b8; font-size: 1.5rem;"></i>
+                                {% elif idx == 2 %}
+                                    <i class="fa-solid fa-medal" style="color: #b45309; font-size: 1.3rem;"></i>
+                                {% else %}
+                                    <span style="color: var(--text-secondary);">#{{ idx + 1 }}</span>
+                                {% endif %}
+                            </td>
+                            
+                            <td style="padding: 1rem; font-weight: 600; color: {% if username == r.username %}var(--accent-purple){% else %}#fff{% endif %};">
+                                <i class="fa-solid fa-user-astronaut" style="margin-right: 0.5rem; color: var(--text-secondary);"></i> {{ r.username }}
+                                {% if r.username == username %} <span style="font-size: 0.7rem; background: var(--accent-purple); color: white; padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.5rem;">TÚ</span>{% endif %}
+                            </td>
+                            
+                            <td style="padding: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                                {{ r.carrera }}
+                            </td>
+                            
+                            <td style="padding: 1rem; text-align: center; font-weight: 700; color: #38bdf8;">
+                                {{ r.materias_aprobadas }}
+                            </td>
+                            
+                            <td style="padding: 1rem; text-align: center;">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                    <div style="width: 60px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                                        <div style="width: {{ r.avance_porcentaje }}%; height: 100%; background: linear-gradient(90deg, #38bdf8, #818cf8);"></div>
+                                    </div>
+                                    <span style="font-size: 0.85rem; color: var(--text-secondary);">{{ r.avance_porcentaje }}%</span>
+                                </div>
+                            </td>
+                            
+                            <td style="padding: 1rem; border-radius: 0 8px 8px 0; text-align: right; font-weight: 800; font-size: 1.1rem; color: #10b981;">
+                                {{ r.promedio if r.promedio else '-' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        
+                        {% if ranking|length == 0 %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                                <i class="fa-solid fa-ghost" style="font-size: 3rem; opacity: 0.3; margin-bottom: 1rem;"></i>
+                                <p>Aún no hay estudiantes en el ranking. ¡Sé el primero en aprobar materias!</p>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>
 <div class="tab-pane" id="tab-horario">
 <!-- Sección: Horario Semanal de Cursada (Calendario de Cursada) -->
 <section class="glass-panel horario-semanal-panel collapsible-panel" style="margin-bottom: 2.5rem; border: 1px solid rgba(6, 182, 212, 0.2); position: relative;">
