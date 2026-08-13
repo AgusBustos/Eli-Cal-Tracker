@@ -12,8 +12,13 @@ import datetime
 load_dotenv()
 
 
+from werkzeug.middleware.proxy_fix import ProxyFix
+
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "super_secret_key_for_eli_cal")
+
+# Tell Flask it is behind a proxy (like Render) to generate https:// URLs for OAuth
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Email Config
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
