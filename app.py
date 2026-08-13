@@ -423,7 +423,7 @@ def index():
             else:
                 tiempo_total_cursada_str = "0h"
             
-            # 8. Obtener Ranking Global
+            # 8. Obtener Ranking Global (Top 5)
             cur.execute("""
                 SELECT 
                     u.username, 
@@ -435,7 +435,8 @@ def index():
                 JOIN carreras c ON u.carrera_id = c.id
                 JOIN usuario_materias um ON u.id = um.usuario_id
                 GROUP BY u.id, u.username, c.nombre
-                ORDER BY materias_aprobadas DESC, promedio DESC;
+                ORDER BY materias_aprobadas DESC, promedio DESC
+                LIMIT 5;
             """)
             ranking = cur.fetchall()
 
