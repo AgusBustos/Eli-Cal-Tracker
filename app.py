@@ -205,6 +205,23 @@ def elegir_carrera():
                     ON CONFLICT (usuario_id, materia_id) DO NOTHING;
                 """, (user_id, carrera_id))
                 
+                # Sync basic sciences (shared subjects) from previous careers
+                cur.execute("""
+                    UPDATE usuario_materias um_new
+                    SET estado = um_old.estado,
+                        nota_final = um_old.nota_final,
+                        veces_cursada = um_old.veces_cursada
+                    FROM materias m_new, materias m_old, usuario_materias um_old
+                    WHERE um_new.usuario_id = %s
+                      AND um_old.usuario_id = %s
+                      AND um_new.materia_id = m_new.id
+                      AND um_old.materia_id = m_old.id
+                      AND m_new.carrera_id = %s
+                      AND m_old.carrera_id != %s
+                      AND m_new.nombre = m_old.nombre
+                      AND (um_old.estado != 'Pendiente' OR um_old.veces_cursada > 0);
+                """, (user_id, user_id, carrera_id, carrera_id))
+                
                 conn.commit()
                 return redirect(url_for("index"))
                 
@@ -257,9 +274,9 @@ def index():
                 SELECT m.id, m.nombre, m.nivel, um.estado, um.nota_final, um.veces_cursada
                 FROM materias m
                 JOIN usuario_materias um ON m.id = um.materia_id
-                WHERE um.usuario_id = %s
+                WHERE um.usuario_id = %s AND m.carrera_id = %s
                 ORDER BY m.nivel, m.nombre;
-            """, (user_id,))
+            """, (user_id, user['carrera_id']))
             materias_all = cur.fetchall()
 
             plan_estudios = {}
@@ -282,7 +299,7 @@ def index():
                 SELECT m.id, m.nombre, m.nivel
                 FROM materias m
                 JOIN usuario_materias um ON m.id = um.materia_id
-                WHERE um.usuario_id = %s AND um.estado = 'Pendiente'
+                WHERE um.usuario_id = %s AND m.carrera_id = %s AND um.estado = 'Pendiente'
                   AND NOT EXISTS (
                       SELECT 1 
                       FROM correlativas c
@@ -293,7 +310,7 @@ def index():
                         AND corr_um.estado NOT IN ('Regular', 'Aprobada')
                   )
                 ORDER BY m.nivel, m.nombre;
-            """, (user_id, user_id))
+            """, (user_id, user['carrera_id'], user_id))
             materias_habilitadas_cursar = cur.fetchall()
 
             # 4. Materias Habilitadas para Rendir
@@ -301,7 +318,7 @@ def index():
                 SELECT m.id, m.nombre, m.nivel
                 FROM materias m
                 JOIN usuario_materias um ON m.id = um.materia_id
-                WHERE um.usuario_id = %s AND um.estado = 'Regular'
+                WHERE um.usuario_id = %s AND m.carrera_id = %s AND um.estado = 'Regular'
                   AND NOT EXISTS (
                       SELECT 1 
                       FROM correlativas c
@@ -309,27 +326,26 @@ def index():
                       WHERE c.materia_id = m.id
                         AND corr_um.usuario_id = %s
                         AND c.tipo_requisito = 'Aprobada'
-                        AND corr_um.estado <> 'Aprobada'
+                        AND corr_um.estado != 'Aprobada'
                   )
                 ORDER BY m.nivel, m.nombre;
-            """, (user_id, user_id))
+            """, (user_id, user['carrera_id'], user_id))
             materias_habilitadas_rendir = cur.fetchall()
 
-            # Correlativas
+            # 5. Obtener Correlativas Structuradas (para el mapa)
             cur.execute("""
                 SELECT 
-                    c.materia_id, 
-                    c.correlativa_id, 
-                    c.tipo_requisito, 
-                    corr.nombre as correlativa_nombre,
-                    corr.nivel as correlativa_nivel,
-                    corr_um.estado as correlativa_estado
-                FROM correlativas c
-                JOIN materias corr ON c.correlativa_id = corr.id
-                JOIN usuario_materias corr_um ON corr.id = corr_um.materia_id
-                WHERE corr_um.usuario_id = %s
-                ORDER BY c.materia_id, c.tipo_requisito, corr.nivel, corr.nombre;
-            """, (user_id,))
+                    m.id as materia_id, m.nombre as materia_nombre, m.nivel as materia_nivel, um.estado as materia_estado,
+                    c.correlativa_id, c.tipo_requisito,
+                    cm.nombre as correlativa_nombre, cum.estado as correlativa_estado
+                FROM materias m
+                JOIN usuario_materias um ON m.id = um.materia_id AND um.usuario_id = %s
+                LEFT JOIN correlativas c ON m.id = c.materia_id
+                LEFT JOIN materias cm ON c.correlativa_id = cm.id
+                LEFT JOIN usuario_materias cum ON cm.id = cum.materia_id AND cum.usuario_id = %s
+                WHERE m.carrera_id = %s
+                ORDER BY m.nivel, m.id;
+            """, (user_id, user_id, user['carrera_id']))
             correlativas_rows = cur.fetchall()
 
             correlativas_info = {}
@@ -338,14 +354,14 @@ def index():
                 if m_id not in correlativas_info:
                     correlativas_info[m_id] = {'Regularizada': [], 'Aprobada': []}
                 
-                correlativas_info[m_id][r['tipo_requisito']].append({
-                    'id': r['correlativa_id'],
-                    'nombre': r['correlativa_nombre'],
-                    'nivel': r['correlativa_nivel'],
-                    'estado': r['correlativa_estado']
-                })
+                if r['correlativa_id']:
+                    correlativas_info[m_id][r['tipo_requisito']].append({
+                        'id': r['correlativa_id'],
+                        'nombre': r['correlativa_nombre'],
+                        'estado': r['correlativa_estado']
+                    })
 
-            # 5. Parciales
+            # 6. Parciales
             cur.execute("""
                 SELECT p.id, p.materia_id, p.nombre, to_char(p.fecha, 'YYYY-MM-DD"T"HH24:MI:SS') as fecha_iso, p.descripcion, m.nombre as materia_nombre, m.nivel as materia_nivel, p.notificar, p.antelacion_dias
                 FROM parciales p
@@ -360,7 +376,7 @@ def index():
                 SELECT m.id, m.nombre, m.nivel, um.estado
                 FROM materias m
                 JOIN usuario_materias um ON m.id = um.materia_id
-                WHERE um.usuario_id = %s AND um.estado <> 'Aprobada'
+                WHERE um.usuario_id = %s AND m.carrera_id = %s AND um.estado <> 'Aprobada'
                   AND NOT EXISTS (
                       SELECT 1 
                       FROM correlativas c
@@ -371,7 +387,7 @@ def index():
                         AND corr_um.estado NOT IN ('Regular', 'Aprobada')
                   )
                 ORDER BY m.nivel, m.nombre;
-            """, (user_id, user_id))
+            """, (user_id, user['carrera_id'], user_id))
             materias_disponibles_agenda = cur.fetchall()
 
             # 7. Horarios cursada
@@ -379,9 +395,9 @@ def index():
                 SELECT h.id, h.materia_id, h.dia_semana, to_char(h.hora_inicio, 'HH24:MI') as hora_inicio, to_char(h.hora_fin, 'HH24:MI') as hora_fin, h.aula_comision, m.nombre as materia_nombre, m.nivel as materia_nivel
                 FROM horarios_cursada h
                 JOIN materias m ON h.materia_id = m.id
-                WHERE h.usuario_id = %s
+                WHERE h.usuario_id = %s AND m.carrera_id = %s
                 ORDER BY h.dia_semana, h.hora_inicio;
-            """, (user_id,))
+            """, (user_id, user['carrera_id']))
             horarios_cursada_raw = cur.fetchall()
 
             horarios_cursada = []
@@ -519,9 +535,27 @@ def update_estado():
     try:
         with conn.cursor() as cur:
             if nuevo_estado != 'Aprobada':
-                cur.execute("UPDATE usuario_materias SET estado = %s, nota_final = NULL WHERE usuario_id = %s AND materia_id = %s;", (nuevo_estado, user_id, materia_id))
+                cur.execute("""
+                    UPDATE usuario_materias
+                    SET estado = %s, nota_final = NULL
+                    WHERE usuario_id = %s 
+                      AND materia_id IN (
+                          SELECT m1.id FROM materias m1 
+                          JOIN materias m2 ON m1.nombre = m2.nombre 
+                          WHERE m2.id = %s
+                      );
+                """, (nuevo_estado, user_id, materia_id))
             else:
-                cur.execute("UPDATE usuario_materias SET estado = %s WHERE usuario_id = %s AND materia_id = %s;", (nuevo_estado, user_id, materia_id))
+                cur.execute("""
+                    UPDATE usuario_materias
+                    SET estado = %s
+                    WHERE usuario_id = %s 
+                      AND materia_id IN (
+                          SELECT m1.id FROM materias m1 
+                          JOIN materias m2 ON m1.nombre = m2.nombre 
+                          WHERE m2.id = %s
+                      );
+                """, (nuevo_estado, user_id, materia_id))
             conn.commit()
         return jsonify({"success": True})
     finally:
@@ -538,7 +572,17 @@ def update_nota():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("UPDATE usuario_materias SET nota_final = %s WHERE usuario_id = %s AND materia_id = %s AND estado = 'Aprobada';", (nota, user_id, materia_id))
+            cur.execute("""
+                UPDATE usuario_materias
+                SET nota_final = %s
+                WHERE usuario_id = %s 
+                  AND estado = 'Aprobada'
+                  AND materia_id IN (
+                      SELECT m1.id FROM materias m1 
+                      JOIN materias m2 ON m1.nombre = m2.nombre 
+                      WHERE m2.id = %s
+                  );
+            """, (nota, user_id, materia_id))
             conn.commit()
         return jsonify({"success": True})
     finally:
@@ -555,7 +599,16 @@ def update_veces_cursada():
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("UPDATE usuario_materias SET veces_cursada = %s WHERE usuario_id = %s AND materia_id = %s;", (veces, user_id, materia_id))
+            cur.execute("""
+                UPDATE usuario_materias
+                SET veces_cursada = %s
+                WHERE usuario_id = %s 
+                  AND materia_id IN (
+                      SELECT m1.id FROM materias m1 
+                      JOIN materias m2 ON m1.nombre = m2.nombre 
+                      WHERE m2.id = %s
+                  );
+            """, (veces, user_id, materia_id))
             conn.commit()
         return jsonify({"success": True})
     finally:
