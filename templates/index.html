@@ -1548,42 +1548,47 @@
             <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Aquí puedes ver todas las materias separadas por año, con tu nota final y veces cursada.</p>
             {% for nivel, materias in plan_estudios.items() %}
             <div class="card" style="margin-bottom: 1.5rem; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.05);">
-                <h3 style="margin-top: 0; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem;">
-                    Nivel {{ nivel }} 
+                <h3 onclick="togglePlanNivel('nivel-content-{{ nivel }}', this)" style="margin-top: 0; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5rem; cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fa-solid fa-chevron-up" style="transition: transform 0.3s; font-size: 0.9rem; color: var(--text-secondary);"></i>
+                        <span>Nivel {{ nivel }}</span>
+                    </div>
                     {% if promedios_por_nivel.get(nivel) %}
-                        <span style="font-size: 0.9rem; float: right; color: var(--success);"><i class="fa-solid fa-star"></i> Promedio: {{ promedios_por_nivel[nivel] }}</span>
+                        <span style="font-size: 0.9rem; color: var(--success);"><i class="fa-solid fa-star"></i> Promedio: {{ promedios_por_nivel[nivel] }}</span>
                     {% endif %}
                 </h3>
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="text-align: left; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">
-                            <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Materia</th>
-                            <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Estado</th>
-                            <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Nota Final</th>
-                            <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Veces Cursada</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for m in materias %}
-                        <tr>
-                            <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02); font-weight: 500;">{{ m.nombre }}</td>
-                            <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02);">
-                                <select onchange="updateMateriaEstado({{ m.id }}, this.value)" style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--glass-border); border-radius: 4px; padding: 0.3rem;">
-                                    <option value="Pendiente" style="color: black;" {% if m.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
-                                    <option value="Regular" style="color: black;" {% if m.estado == 'Regular' %}selected{% endif %}>Regular</option>
-                                    <option value="Aprobada" style="color: black;" {% if m.estado == 'Aprobada' %}selected{% endif %}>Aprobada</option>
-                                </select>
-                            </td>
-                            <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02);">
-                                <input type="number" min="1" max="10" step="1" value="{{ m.nota_final if m.nota_final else '' }}" onchange="updateMateriaNota({{ m.id }}, this.value)" style="width: 70px; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--glass-border); border-radius: 4px; padding: 0.3rem;" {% if m.estado != 'Aprobada' %}disabled placeholder="-" {% endif %}>
-                            </td>
-                            <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02);">
-                                <input type="number" min="0" step="1" value="{{ m.veces_cursada if m.veces_cursada else 0 }}" onchange="updateMateriaVeces({{ m.id }}, this.value)" style="width: 70px; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--glass-border); border-radius: 4px; padding: 0.3rem;">
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <div id="nivel-content-{{ nivel }}" style="overflow-x: auto; transition: max-height 0.4s ease, opacity 0.4s ease; max-height: 2000px; opacity: 1;">
+                    <table style="width: 100%; border-collapse: collapse; min-width: 600px;">
+                        <thead>
+                            <tr style="text-align: left; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">
+                                <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Materia</th>
+                                <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Estado</th>
+                                <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Nota Final</th>
+                                <th style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">Veces Cursada</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in materias %}
+                            <tr>
+                                <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02); font-weight: 500;">{{ m.nombre }}</td>
+                                <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02);">
+                                    <select onchange="updateMateriaEstado({{ m.id }}, this.value)" style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--glass-border); border-radius: 4px; padding: 0.3rem;">
+                                        <option value="Pendiente" style="color: black;" {% if m.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+                                        <option value="Regular" style="color: black;" {% if m.estado == 'Regular' %}selected{% endif %}>Regular</option>
+                                        <option value="Aprobada" style="color: black;" {% if m.estado == 'Aprobada' %}selected{% endif %}>Aprobada</option>
+                                    </select>
+                                </td>
+                                <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02);">
+                                    <input type="number" min="1" max="10" step="1" value="{{ m.nota_final if m.nota_final else '' }}" onchange="updateMateriaNota({{ m.id }}, this.value)" style="width: 70px; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--glass-border); border-radius: 4px; padding: 0.3rem;" {% if m.estado != 'Aprobada' %}disabled placeholder="-" {% endif %}>
+                                </td>
+                                <td style="padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.02);">
+                                    <input type="number" min="0" step="1" value="{{ m.veces_cursada if m.veces_cursada else 0 }}" onchange="updateMateriaVeces({{ m.id }}, this.value)" style="width: 70px; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--glass-border); border-radius: 4px; padding: 0.3rem;">
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -2867,6 +2872,31 @@
             }, 2500);
         }
     </script>
+
+<script>
+    function togglePlanNivel(contentId, headerElement) {
+        const content = document.getElementById(contentId);
+        const icon = headerElement.querySelector('.fa-chevron-up, .fa-chevron-down');
+        
+        if (content.style.maxHeight === '0px' || content.style.maxHeight === '') {
+            content.style.maxHeight = '2000px';
+            content.style.opacity = '1';
+            content.style.marginTop = '1rem';
+            if (icon) {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            }
+        } else {
+            content.style.maxHeight = '0px';
+            content.style.opacity = '0';
+            content.style.marginTop = '0';
+            if (icon) {
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        }
+    }
+</script>
 
 <script>
     function switchTab(tabId, event) {
