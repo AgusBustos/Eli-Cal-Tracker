@@ -13,7 +13,10 @@ DROP TABLE IF EXISTS usuarios CASCADE;
 CREATE TABLE usuarios (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),
+    email VARCHAR(150) UNIQUE,
+    google_id VARCHAR(150) UNIQUE,
+    is_admin BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -50,7 +53,9 @@ CREATE TABLE parciales (
     materia_id INT NOT NULL REFERENCES materias(id) ON DELETE CASCADE,
     nombre VARCHAR(100) NOT NULL,
     fecha TIMESTAMP NOT NULL,
-    descripcion TEXT
+    descripcion TEXT,
+    notificar BOOLEAN DEFAULT FALSE,
+    antelacion_dias INTEGER DEFAULT 1
 );
 CREATE INDEX idx_parciales_fecha_usuario ON parciales(usuario_id, fecha);
 
