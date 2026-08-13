@@ -904,26 +904,50 @@
 <h1>Mi Tracker Universitario</h1>
 <p>Control de materias, estados académicos y correlatividades</p>
 </header>
-<nav class="main-nav" style="display: flex; justify-content: space-between; align-items: center;">
-    <div style="display: flex; gap: 0.5rem; overflow-x: auto; flex: 1;">
+<nav class="main-nav" style="display: flex; flex-direction: column; background: rgba(30, 41, 59, 0.5); border: 1px solid var(--glass-border); border-radius: 16px; padding: 1rem; margin-bottom: 2rem;">
+    <!-- Fila superior: Hamburguesa y Usuario -->
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <button id="hamburger-menu" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-primary); padding: 0.75rem 1.5rem; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: 0.3s; display: flex; align-items: center; gap: 0.75rem;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'" onclick="toggleNavMenu()">
+            <i class="fa-solid fa-bars"></i> Menú
+        </button>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            {% if is_admin %}
+            <a href="/admin" style="color: #fbbf24; text-decoration: none; font-size: 0.9rem; padding: 0.5rem 1rem; background: rgba(251, 191, 36, 0.1); border-radius: 8px; transition: 0.3s; font-weight: 600;"><i class="fa-solid fa-crown"></i> Admin</a>
+            {% endif %}
+            <button id="theme-toggle" class="nav-btn" style="padding: 0.5rem; border-radius: 50%;" title="Cambiar Tema">
+                <i class="fa-solid fa-moon"></i>
+            </button>
+            <span style="color: var(--text-secondary); font-size: 0.9rem;"><i class="fa-solid fa-user"></i> {{ username }}</span>
+            <a href="/logout" style="color: #f87171; text-decoration: none; font-size: 0.9rem; padding: 0.5rem 1rem; background: rgba(239, 68, 68, 0.1); border-radius: 8px; transition: 0.3s;"><i class="fa-solid fa-right-from-bracket"></i> Salir</a>
+        </div>
+    </div>
+    <!-- Opciones del menú (Colapsables) -->
+    <div id="nav-menu" style="display: flex; flex-wrap: wrap; gap: 0.5rem; max-height: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0.1, 0.8, 0.2, 1), margin-top 0.4s; width: 100%;">
         <button class="nav-btn active" onclick="switchTab('inicio', event)"><i class="fa-solid fa-house"></i> Inicio</button>
         <button class="nav-btn" onclick="switchTab('evaluaciones', event)"><i class="fa-solid fa-calendar-check"></i> Evaluaciones</button>
         <button class="nav-btn" onclick="switchTab('horario', event)"><i class="fa-solid fa-clock"></i> Horario Semanal</button>
         <button class="nav-btn" onclick="switchTab('plan', event)"><i class="fa-solid fa-book"></i> Plan de Estudios</button>
         <button class="nav-btn" onclick="switchTab('mapa', event)"><i class="fa-solid fa-diagram-project"></i> Correlativas</button>
-        <!-- <button class="nav-btn" onclick="switchTab('diagrama', event)"><i class="fa-solid fa-network-wired"></i> Diagrama</button> -->
-    </div>
-    <div style="display: flex; align-items: center; gap: 1rem; padding-left: 1rem; border-left: 1px solid rgba(255,255,255,0.1); margin-left: 0.5rem;">
-        {% if is_admin %}
-        <a href="/admin" style="color: #fbbf24; text-decoration: none; font-size: 0.9rem; padding: 0.5rem 1rem; background: rgba(251, 191, 36, 0.1); border-radius: 8px; transition: 0.3s; font-weight: 600;"><i class="fa-solid fa-crown"></i> Admin</a>
-        {% endif %}
-        <button id="theme-toggle" class="nav-btn" style="padding: 0.5rem; border-radius: 50%;" title="Cambiar Tema">
-            <i class="fa-solid fa-moon"></i>
-        </button>
-        <span style="color: var(--text-secondary); font-size: 0.9rem;"><i class="fa-solid fa-user"></i> {{ username }}</span>
-        <a href="/logout" style="color: #f87171; text-decoration: none; font-size: 0.9rem; padding: 0.5rem 1rem; background: rgba(239, 68, 68, 0.1); border-radius: 8px; transition: 0.3s;"><i class="fa-solid fa-right-from-bracket"></i> Salir</a>
     </div>
 </nav>
+
+<script>
+    function toggleNavMenu() {
+        const menu = document.getElementById('nav-menu');
+        const icon = document.querySelector('#hamburger-menu i');
+        if (menu.style.maxHeight === '0px' || menu.style.maxHeight === '') {
+            menu.style.maxHeight = '500px';
+            menu.style.marginTop = '1rem';
+            icon.classList.remove('fa-bars');
+            icon.classList.add('fa-times');
+        } else {
+            menu.style.maxHeight = '0px';
+            menu.style.marginTop = '0';
+            icon.classList.remove('fa-times');
+            icon.classList.add('fa-bars');
+        }
+    }
+</script>
 <div class="tab-pane active" id="tab-inicio"><section class="dashboard-hero">
 <!-- Barra de Progreso -->
 <div class="progress-section">
@@ -2862,6 +2886,18 @@
             // Restore active state to the correct nav button if event is missing (e.g. on load)
             const btn = document.querySelector(`.nav-btn[onclick*="switchTab('${tabId}'"]`);
             if (btn) btn.classList.add('active');
+        }
+        
+        // Si el menú hamburguesa está abierto, cerrarlo automáticamente
+        const menu = document.getElementById('nav-menu');
+        const icon = document.querySelector('#hamburger-menu i');
+        if (menu && menu.style.maxHeight !== '0px' && menu.style.maxHeight !== '') {
+            menu.style.maxHeight = '0px';
+            menu.style.marginTop = '0';
+            if (icon) {
+                icon.classList.remove('fa-times');
+                icon.classList.add('fa-bars');
+            }
         }
         
         // AUTOGUARDADO DE PESTAÑA: Memoriza dónde está el usuario para no mandarlo al inicio si la página se recarga
